@@ -45,14 +45,28 @@ class NormalIGTracker:
 
     def update(self, new_data: np.ndarray, indices: Optional[np.ndarray] = None) -> None:
         """Update posterior parameters with new data points.
-        
+
+        This method implements ``n_active`` *independent univariate* NIG updates,
+        one per feature column.  Despite accepting a 2-D matrix, the model is
+        **not** multivariate: each column j has its own ``(μ_j, σ²_j)`` posterior
+        and is updated entirely from ``new_data[:, j]``.
+
+        The i.i.d. assumption applies *within* each column: the ``n_samples``
+        rows of ``new_data[:, j]`` are treated as i.i.d. draws from
+        ``Normal(μ_j, σ²_j)``.  There is no assumption about the relationship
+        between columns — each feature may have a completely different scale or
+        distribution without affecting correctness.
+
         Parameters
         ----------
         new_data : np.ndarray
-            1D array of shape (n_active,) or 2D array of shape (n_samples, n_active).
-            If 1D, it's treated as a single observation per active feature.
+            1D array of shape ``(n_active,)`` or 2D array of shape
+            ``(n_samples, n_active)``.  If 1D, it is treated as a single
+            observation (n_samples=1) for each active feature.
         indices : Optional[np.ndarray], default=None
-            The feature indices that were active. If None, assumes all features are updated.
+            Feature indices corresponding to the columns of ``new_data``.
+            If ``None``, all ``n_features`` features are updated and
+            ``n_active`` must equal ``n_features``.
         """
         data = np.asarray(new_data, dtype=float)
         if data.ndim == 1:

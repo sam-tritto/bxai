@@ -106,27 +106,43 @@ class BayesianPermutation(BaseEstimator):
             prior_beta=self.prior_beta,
         )
 
-        # Record deltas
+        # deltas[r, j] = baseline_score − score_when_feature_j_is_shuffled.
+        # Shape: (n_repeats, n_features).
         deltas = np.zeros((self.n_repeats, n_features))
 
-        # Perform permutation repeats
+        # Permutation protocol (mirrors sklearn permutation_importance):
+        #   • Each repeat r starts from a fresh copy of X so that shuffling
+        #     feature j does not bleed into the evaluation of feature j+1.
+        #   • Within a repeat, only one feature is shuffled at a time; all
+        #     others retain their original values.  After scoring, the column
+        #     is restored before moving to the next feature.
+        # This gives n_repeats independent, unbiased importance draws per feature.
         for r in range(self.n_repeats):
             X_temp = X_arr.copy()
             for col_idx in range(n_features):
                 # Shuffle column
                 original_col = X_temp[:, col_idx].copy()
                 X_temp[:, col_idx] = rng.permutation(original_col)
-                
+
                 # Compute shuffled score
                 shuffled_score = scorer(self.model, X_temp, y_arr)
-                
+
                 # Drop in score is baseline - shuffled (higher positive means more important)
                 deltas[r, col_idx] = baseline_score - shuffled_score
-                
-                # Restore column
+
+                # Restore column before evaluating the next feature
                 X_temp[:, col_idx] = original_col
 
-        # Update tracker with all deltas at once
+        # Feed all repeats to the tracker in a single batch.
+        #
+        # Statistical semantics: deltas is treated as n_repeats i.i.d. draws
+        # from the importance distribution of each feature.  The NIG conjugate
+        # update decomposes *column-by-column* (each feature has its own
+        # independent (μ_j, σ²_j) pair), so passing the full (n_repeats ×
+        # n_features) matrix is equivalent to n_features independent univariate
+        # NIG updates — one per feature — not a single multivariate update.
+        # The rows are NOT assumed to be identically distributed across features
+        # (each column has its own scale), only within a column.
         self.tracker_.update(deltas)
 
         # Make decisions

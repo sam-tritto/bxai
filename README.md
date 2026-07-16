@@ -1,5 +1,9 @@
 # bxai
 
+<p align="center">
+  <img src="assets/logo.png" alt="bxai Logo" width="400"/>
+</p>
+
 Bayesian Feature Attribution and XAI Suite.
 
 A Python package implementing rigorous, computationally efficient Bayesian methods for feature selection and model explainability. The guiding principle is "Rigorous but Fast": leveraging closed-form analytical updates wherever possible to avoid the heavy computational drag of full MCMC simulations, while maintaining statistical integrity.

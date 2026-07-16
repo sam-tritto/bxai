@@ -149,3 +149,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+
+
+assets/**

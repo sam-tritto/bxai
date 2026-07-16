@@ -6,7 +6,7 @@ from sklearn.utils.multiclass import type_of_target
 import lightgbm as lgb
 from typing import Optional, List, Union, Any
 
-from bxai._utils.types import FeatureStatus, FeaturePosterior
+from bxai._utils.types import FeatureStatus
 from bxai._utils.validation import check_consistent_length
 from bxai._engines.beta_binomial import BetaBinomialTracker
 from bxai._engines.normal_ig import NormalIGTracker

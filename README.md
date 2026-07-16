@@ -4,30 +4,23 @@
   <img src="assets/logo.png" alt="bxai Logo" width="400"/>
 </p>
 
-Bayesian Feature Attribution and XAI Suite.
+# Bayesian Feature Attribution and XAI Suite.
 
 A Python package implementing rigorous, computationally efficient Bayesian methods for feature selection and model explainability. The guiding principle is "Rigorous but Fast": leveraging closed-form analytical updates wherever possible to avoid the heavy computational drag of full MCMC simulations, while maintaining statistical integrity.
 
 ## Features
 
-- **Phase 1: Global Non-Linear Selection**
+- **Global Non-Linear Selection**
   - `BayesianBorutaSHAP`: Tree-based feature selection using SHAP values, swapping frequentist p-values for Bayesian credible intervals, with dynamic pruning for fast performance. Supports discrete (Beta-Binomial) and continuous (Normal-Inverse-Gamma) modes.
   - `BayesianPermutation`: Model-agnostic importance tracking using paired validation loss drops updated via the Student-t continuous engine.
 
-- **Phase 2: Local Interpretability**
+- **Local Interpretability**
   - `BayLIME`: Stable, prior-informed local explanations wrapping standard/custom perturbations in a closed-form Bayesian linear regression. Can be seeded with global SHAP weights from Phase 1.
 
-- **Phase 3: Parametric & Native Bayesian Importance**
+- **Parametric & Native Bayesian Importance**
   - `ShrinkagePIP`: High-dimensional GLMs with Horseshoe and Lasso regularizing priors, tracking Posterior Inclusion Probabilities (PIP). Uses the posterior shrinkage factor κ_j = 1/(1+λ_j²τ²) for the Horseshoe prior (correct for continuous shrinkage distributions) and an auto-data-scaled |β_j| threshold for the Lasso (requires `mcmc` extra).
   - `BARTImportance`: Variable inclusion frequency (VIF) tracking from native Bayesian Additive Regression Trees (requires `mcmc` extra).
 
-- **Input Validation**: All estimators and engines validate hyperparameters before any computation starts and raise `ValueError` with clear, actionable messages for:
-  - `confirm_threshold <= reject_threshold` (impossible decision boundary).
-  - `credible_mass` outside `(0, 1)`.
-  - `prior_alpha <= 0` or `prior_beta <= 0` (invalid Beta / NIG distribution).
-  - `prior_nu <= 0` (invalid NIG pseudo-sample-count).
-  - `n_repeats < 2` in `BayesianPermutation` (NIG variance needs ≥ 2 observations).
-  - `kappa_threshold` or `pip_threshold` outside `(0, 1)` in `ShrinkagePIP`.
 
 ## Installation
 

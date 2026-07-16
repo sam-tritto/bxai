@@ -23,8 +23,20 @@ class NormalIGTracker:
         prior_alpha: float = 1e-4,
         prior_beta: float = 1e-4,
     ):
+        if prior_nu <= 0:
+            raise ValueError(
+                f"prior_nu must be > 0 for a valid Normal-Inverse-Gamma prior; got {prior_nu!r}"
+            )
+        if prior_alpha <= 0:
+            raise ValueError(
+                f"prior_alpha must be > 0 for a valid Normal-Inverse-Gamma prior; got {prior_alpha!r}"
+            )
+        if prior_beta <= 0:
+            raise ValueError(
+                f"prior_beta must be > 0 for a valid Normal-Inverse-Gamma prior; got {prior_beta!r}"
+            )
         self.n_features = n_features
-        
+
         # Initialize prior parameters
         self.mu = np.full(n_features, float(prior_mu))
         self.nu = np.full(n_features, float(prior_nu))
@@ -82,11 +94,15 @@ class NormalIGTracker:
 
     def credible_interval(self, credible_mass: float = 0.95) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the Highest Density / Equal-Tailed Credible Interval bounds for the mean μ.
-        
+
         Returns
         ----------
         lower, upper : np.ndarray
         """
+        if not (0.0 < credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {credible_mass!r}"
+            )
         # Degrees of freedom: 2 * alpha
         df = 2.0 * self.alpha
         loc = self.mu
@@ -98,20 +114,24 @@ class NormalIGTracker:
 
     def decide(self, credible_mass: float = 0.95, threshold: float = 0.0) -> np.ndarray:
         """Decide the status of each feature based on whether the HDI bounds zero.
-        
+
         Parameters
         ----------
         credible_mass : float, default=0.95
-            The credible mass (1 - alpha) of the interval.
+            The credible mass (1 - alpha) of the interval.  Must be in (0, 1).
         threshold : float, default=0.0
             The reference value (typically 0.0). If the interval is completely above
             the threshold, the feature is CONFIRMED. If the interval is completely
             below the threshold, the feature is REJECTED. Otherwise, TENTATIVE.
-            
+
         Returns
         ----------
         status : np.ndarray of FeatureStatus
         """
+        if not (0.0 < credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {credible_mass!r}"
+            )
         lower, upper = self.credible_interval(credible_mass)
         status = np.full(self.n_features, FeatureStatus.TENTATIVE, dtype=object)
         

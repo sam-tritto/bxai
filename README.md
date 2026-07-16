@@ -17,6 +17,14 @@ A Python package implementing rigorous, computationally efficient Bayesian metho
   - `ShrinkagePIP`: High-dimensional GLMs with Horseshoe and Lasso regularizing priors, tracking Posterior Inclusion Probabilities (PIP). Uses the posterior shrinkage factor κ_j = 1/(1+λ_j²τ²) for the Horseshoe prior (correct for continuous shrinkage distributions) and an auto-data-scaled |β_j| threshold for the Lasso (requires `mcmc` extra).
   - `BARTImportance`: Variable inclusion frequency (VIF) tracking from native Bayesian Additive Regression Trees (requires `mcmc` extra).
 
+- **Input Validation**: All estimators and engines validate hyperparameters before any computation starts and raise `ValueError` with clear, actionable messages for:
+  - `confirm_threshold <= reject_threshold` (impossible decision boundary).
+  - `credible_mass` outside `(0, 1)`.
+  - `prior_alpha <= 0` or `prior_beta <= 0` (invalid Beta / NIG distribution).
+  - `prior_nu <= 0` (invalid NIG pseudo-sample-count).
+  - `n_repeats < 2` in `BayesianPermutation` (NIG variance needs ≥ 2 observations).
+  - `kappa_threshold` or `pip_threshold` outside `(0, 1)` in `ShrinkagePIP`.
+
 ## Installation
 
 Install using `uv`:

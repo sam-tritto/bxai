@@ -98,6 +98,19 @@ class ShrinkagePIP(BaseEstimator):
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _validate_hyperparams(self) -> None:
+        """Raise ValueError for any hyperparameter combination that is statistically invalid."""
+        if not (0.0 < self.kappa_threshold < 1.0):
+            raise ValueError(
+                f"kappa_threshold must be in (0, 1) because the shrinkage factor \u03ba_j is "
+                f"bounded in (0, 1); got {self.kappa_threshold!r}"
+            )
+        if not (0.0 < self.pip_threshold < 1.0):
+            raise ValueError(
+                f"pip_threshold must be in (0, 1) because PIP is a probability; "
+                f"got {self.pip_threshold!r}"
+            )
+
     def _resolve_pip_method(self) -> str:
         """Return the effective PIP method given ``prior`` and ``pip_method``."""
         if self.pip_method == "auto":
@@ -132,6 +145,7 @@ class ShrinkagePIP(BaseEstimator):
         y : array-like
             Target vector (binary for logistic, continuous for linear).
         """
+        self._validate_hyperparams()
         try:
             import pymc as pm
         except ImportError:

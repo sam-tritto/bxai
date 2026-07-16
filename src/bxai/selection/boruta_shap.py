@@ -95,6 +95,48 @@ class BayesianBorutaSHAP(BaseEstimator):
         self.prior_beta_continuous = prior_beta_continuous
         self.random_state = random_state
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _validate_hyperparams(self) -> None:
+        """Raise ValueError for any hyperparameter combination that is statistically invalid."""
+        if not (0.0 < self.credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {self.credible_mass!r}"
+            )
+        if not (0.0 < self.confirm_threshold < 1.0):
+            raise ValueError(
+                f"confirm_threshold must be in (0, 1); got {self.confirm_threshold!r}"
+            )
+        if not (0.0 < self.reject_threshold < 1.0):
+            raise ValueError(
+                f"reject_threshold must be in (0, 1); got {self.reject_threshold!r}"
+            )
+        if self.confirm_threshold <= self.reject_threshold:
+            raise ValueError(
+                f"confirm_threshold ({self.confirm_threshold!r}) must be strictly greater than "
+                f"reject_threshold ({self.reject_threshold!r}); otherwise no decision is possible."
+            )
+        if self.prior_alpha <= 0:
+            raise ValueError(
+                f"prior_alpha must be > 0 for a valid Beta distribution; got {self.prior_alpha!r}"
+            )
+        if self.prior_beta <= 0:
+            raise ValueError(
+                f"prior_beta must be > 0 for a valid Beta distribution; got {self.prior_beta!r}"
+            )
+        if self.prior_alpha_continuous <= 0:
+            raise ValueError(
+                f"prior_alpha_continuous must be > 0 for a valid NIG prior; "
+                f"got {self.prior_alpha_continuous!r}"
+            )
+        if self.prior_beta_continuous <= 0:
+            raise ValueError(
+                f"prior_beta_continuous must be > 0 for a valid NIG prior; "
+                f"got {self.prior_beta_continuous!r}"
+            )
+
     def fit(self, X: Any, y: Any) -> "BayesianBorutaSHAP":
         """Run the Bayesian Boruta SHAP loop on X and y.
         
@@ -105,6 +147,7 @@ class BayesianBorutaSHAP(BaseEstimator):
         y : array-like
             Target vector.
         """
+        self._validate_hyperparams()
         X_arr, y_arr = check_consistent_length(X, y)
         n_samples, n_features = X_arr.shape
 

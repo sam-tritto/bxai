@@ -41,6 +41,30 @@ class BayesianPermutation(BaseEstimator):
         self.prior_beta = prior_beta
         self.random_state = random_state
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _validate_hyperparams(self) -> None:
+        """Raise ValueError for any hyperparameter combination that is statistically invalid."""
+        if self.n_repeats < 2:
+            raise ValueError(
+                f"n_repeats must be >= 2 so the NIG tracker can form a variance estimate "
+                f"(requires at least 2 observations); got {self.n_repeats!r}"
+            )
+        if not (0.0 < self.credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {self.credible_mass!r}"
+            )
+        if self.prior_alpha <= 0:
+            raise ValueError(
+                f"prior_alpha must be > 0 for a valid NIG prior; got {self.prior_alpha!r}"
+            )
+        if self.prior_beta <= 0:
+            raise ValueError(
+                f"prior_beta must be > 0 for a valid NIG prior; got {self.prior_beta!r}"
+            )
+
     def fit(self, X: Any, y: Any) -> "BayesianPermutation":
         """Compute the Bayesian Permutation Importance of features in X.
         
@@ -51,6 +75,7 @@ class BayesianPermutation(BaseEstimator):
         y : array-like
             Validation target vector.
         """
+        self._validate_hyperparams()
         check_is_fitted(self.model)
         X_arr, y_arr = check_consistent_length(X, y)
         n_samples, n_features = X_arr.shape

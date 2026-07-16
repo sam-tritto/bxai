@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Input validation on hyperparameters** — previously, nonsensical hyperparameter
+  combinations silently produced statistically meaningless or mathematically broken
+  results. The following guards now raise `ValueError` with descriptive messages
+  before any expensive computation begins:
+  - `confirm_threshold <= reject_threshold` in `BetaBinomialTracker.decide` and
+    `BayesianBorutaSHAP` (impossible decision: every feature would be TENTATIVE).
+  - `credible_mass` outside `(0, 1)` in `BetaBinomialTracker.credible_interval /
+    decide`, `NormalIGTracker.credible_interval / decide`, `BayesianBorutaSHAP`,
+    `BayesianPermutation`, and `BARTImportance`.
+  - `prior_alpha <= 0` or `prior_beta <= 0` in `BetaBinomialTracker` (would
+    produce an invalid Beta distribution) and in `NormalIGTracker` (would produce
+    an invalid Normal-Inverse-Gamma prior); same guards are propagated to the
+    corresponding constructor parameters of `BayesianBorutaSHAP` and
+    `BayesianPermutation`.
+  - `prior_nu <= 0` in `NormalIGTracker` (the pseudo-sample-count must be
+    strictly positive for a proper NIG prior).
+  - `n_repeats < 2` in `BayesianPermutation` (the NIG variance estimate requires
+    at least two observations; a single permutation repeat gives a degenerate
+    sum-of-squares of zero).
+  - `kappa_threshold` or `pip_threshold` outside `(0, 1)` in `ShrinkagePIP`
+    (both are probabilities bounded in the open unit interval).
 - **`check_is_fitted`: replaced unreliable custom implementation with `sklearn.utils.validation.check_is_fitted`** —
   the previous implementation walked `dir(estimator)` and returned `True` if any attribute ending
   in `_` existed. This was both unreliable (Python objects carry many single-underscore attributes

@@ -61,6 +61,17 @@ class BARTImportance(BaseEstimator):
         self.progressbar = progressbar
         self.random_state = random_state
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _validate_hyperparams(self) -> None:
+        """Raise ValueError for any hyperparameter combination that is statistically invalid."""
+        if not (0.0 < self.credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {self.credible_mass!r}"
+            )
+
     def fit(self, X: Any, y: Any) -> "BARTImportance":
         """Fit the BART model using PyMC.
         
@@ -71,6 +82,7 @@ class BARTImportance(BaseEstimator):
         y : array-like
             Continuous target vector.
         """
+        self._validate_hyperparams()
         try:
             import pymc as pm
             import pymc_bart as pmb

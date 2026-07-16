@@ -17,10 +17,18 @@ class BetaBinomialTracker:
         prior_alpha: float = 1.0,
         prior_beta: float = 1.0,
     ):
+        if prior_alpha <= 0:
+            raise ValueError(
+                f"prior_alpha must be > 0 for a valid Beta distribution; got {prior_alpha!r}"
+            )
+        if prior_beta <= 0:
+            raise ValueError(
+                f"prior_beta must be > 0 for a valid Beta distribution; got {prior_beta!r}"
+            )
         self.n_features = n_features
         self.prior_alpha = prior_alpha
         self.prior_beta = prior_beta
-        
+
         # Initialize posterior parameters
         self.alpha = np.full(n_features, float(prior_alpha))
         self.beta = np.full(n_features, float(prior_beta))
@@ -55,6 +63,10 @@ class BetaBinomialTracker:
 
     def credible_interval(self, credible_mass: float = 0.95) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the Highest Density / Equal-Tailed Credible Interval bounds."""
+        if not (0.0 < credible_mass < 1.0):
+            raise ValueError(
+                f"credible_mass must be in (0, 1); got {credible_mass!r}"
+            )
         lower, upper = stats.beta.interval(credible_mass, self.alpha, self.beta)
         return lower, upper
 
@@ -65,15 +77,39 @@ class BetaBinomialTracker:
         threshold: float = 0.5,
     ) -> np.ndarray:
         """Decide the status of each feature.
-        
+
+        Parameters
+        ----------
+        confirm_threshold : float
+            Probability above which a feature is CONFIRMED.  Must be in (0, 1)
+            and strictly greater than ``reject_threshold``.
+        reject_threshold : float
+            Probability below which a feature is REJECTED.  Must be in (0, 1)
+            and strictly less than ``confirm_threshold``.
+        threshold : float
+            The exceedance target θ (default 0.5 for the median).
+
         Returns
         ----------
         status : np.ndarray of FeatureStatus
         """
+        if not (0.0 < confirm_threshold < 1.0):
+            raise ValueError(
+                f"confirm_threshold must be in (0, 1); got {confirm_threshold!r}"
+            )
+        if not (0.0 < reject_threshold < 1.0):
+            raise ValueError(
+                f"reject_threshold must be in (0, 1); got {reject_threshold!r}"
+            )
+        if confirm_threshold <= reject_threshold:
+            raise ValueError(
+                f"confirm_threshold ({confirm_threshold!r}) must be strictly greater than "
+                f"reject_threshold ({reject_threshold!r}); otherwise no decision is possible."
+            )
         prob = self.exceedance_probability(threshold)
         status = np.full(self.n_features, FeatureStatus.TENTATIVE, dtype=object)
-        
+
         status[prob >= confirm_threshold] = FeatureStatus.CONFIRMED
         status[prob <= reject_threshold] = FeatureStatus.REJECTED
-        
+
         return status

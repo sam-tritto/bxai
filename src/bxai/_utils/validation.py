@@ -1,6 +1,7 @@
 from typing import Any, Tuple
 import numpy as np
 import pandas as pd
+from sklearn.utils.validation import check_is_fitted  # noqa: F401 — re-exported for internal use
 
 
 def check_array_2d(X: Any) -> np.ndarray:
@@ -34,23 +35,3 @@ def check_consistent_length(X: Any, y: Any) -> Tuple[np.ndarray, np.ndarray]:
         )
     return X_arr, y_arr
 
-
-def check_is_fitted(estimator: Any, attributes: str = "classes_") -> None:
-    """Checks if estimator is fitted by checking for presence of attributes.
-    
-    If attributes is not specified, it checks standard sklearn fitted attributes.
-    """
-    # If the estimator has fit method but is not fitted, typical attributes aren't present.
-    # We check if at least one common fitted attribute ends with an underscore.
-    fitted = False
-    if hasattr(estimator, attributes):
-        fitted = True
-    else:
-        # Check standard sklearn convention: attributes ending with _ but not __
-        for attr in dir(estimator):
-            if attr.endswith("_") and not attr.startswith("__"):
-                fitted = True
-                break
-                
-    if not fitted:
-        raise ValueError(f"This {type(estimator).__name__} instance is not fitted yet.")

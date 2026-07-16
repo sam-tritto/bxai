@@ -5,7 +5,8 @@ from sklearn.metrics import get_scorer
 from typing import Optional, Union, Callable, Any
 
 from bxai._utils.types import FeatureStatus, FeaturePosterior
-from bxai._utils.validation import check_consistent_length, check_is_fitted
+from sklearn.utils.validation import check_is_fitted
+from bxai._utils.validation import check_consistent_length
 from bxai._engines.normal_ig import NormalIGTracker
 
 

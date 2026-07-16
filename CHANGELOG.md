@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`check_is_fitted`: replaced unreliable custom implementation with `sklearn.utils.validation.check_is_fitted`** —
+  the previous implementation walked `dir(estimator)` and returned `True` if any attribute ending
+  in `_` existed. This was both unreliable (Python objects carry many single-underscore attributes
+  unrelated to fitting, and the `__` guard did not prevent traversal of inherited class attrs) and
+  incorrect for external sklearn estimators passed to `BayesianPermutation`: a fitted
+  `RandomForestClassifier` happens to expose `n_estimators_` (an init-param echo), so an unfitted
+  model of the same type would silently pass. The fix removes the bespoke function entirely and
+  re-exports `sklearn.utils.validation.check_is_fitted`, which raises the canonical
+  `NotFittedError`, honours `__sklearn_is_fitted__`, and is consistent with the rest of the
+  sklearn ecosystem. `BayesianPermutation.fit` now imports the function directly from sklearn.
 - **`ShrinkagePIP`: incorrect PIP computation for Horseshoe prior** — the previous
   implementation used a hardcoded `epsilon=1e-3` threshold and evaluated
   PIP = P(|β_j| > ε | data). Because the Horseshoe posterior is a continuous

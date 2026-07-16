@@ -205,8 +205,10 @@ class BayesianBorutaSHAP(BaseEstimator):
         else:
             base_model = clone(self.model)
 
-        if hasattr(base_model, "random_state"):
-            base_model.random_state = self.random_state
+        # Do NOT set random_state on base_model here.  Each iteration must
+        # receive its own derived seed (see below); setting a fixed seed now
+        # would cause every clone to use the same random state, neutralising
+        # the stochasticity of the shadow-feature permutation step.
 
         # Initialize engines
         if self.mode == "discrete":
@@ -252,8 +254,13 @@ class BayesianBorutaSHAP(BaseEstimator):
             # Concatenate features
             X_combined = np.hstack([X_active, X_shadow])
 
-            # Fit the model
+            # Fit the model — give each iteration its own derived seed so
+            # the tree's internal randomness (feature sub-sampling, data
+            # bootstrap) differs across iterations while still being
+            # reproducible when self.random_state is set.
             model_it = clone(base_model)
+            if hasattr(model_it, "random_state"):
+                model_it.random_state = int(rng.integers(2**31 - 1))
             model_it.fit(X_combined, y_arr)
 
             # Compute SHAP values

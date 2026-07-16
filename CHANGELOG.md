@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`BayesianBorutaSHAP`: per-iteration random seed now derived from master RNG** —
+  previously, `base_model.random_state = self.random_state` was set on the template
+  before the loop, so every `clone(base_model)` inside the loop received the identical
+  seed. This caused the tree's internal randomness (feature sub-sampling, bootstrap)
+  to be constant across all iterations, partially undermining the diversity of shadow
+  feature comparisons. The fix removes the pre-loop assignment and instead derives a
+  unique `int(rng.integers(2**31 - 1))` seed for each `model_it` after cloning.
+  End-to-end reproducibility is preserved: the master `rng` is still seeded by
+  `self.random_state`, so the full sequence of per-iteration seeds is deterministic
+  when a seed is provided.
 - **Corrected Highest Density Interval (HDI) computation and labeling** —
   previously, `BARTImportance` and `ShrinkagePIP.summary()` calculated
   equal-tailed percentile intervals using `np.percentile` but labelled them as

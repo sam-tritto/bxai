@@ -22,19 +22,59 @@ def _default_model(y: np.ndarray) -> Any:
 
 
 def _extract_shap_importances(explainer: shap.Explainer, X: np.ndarray) -> np.ndarray:
-    """Extract feature importances as mean absolute SHAP values."""
-    # Try using explainer(X) first as recommended by modern SHAP
+    """Extract feature importances as mean absolute SHAP values.
+
+    Tries the modern ``explainer(X)`` API first, then falls back to the legacy
+    ``explainer.shap_values(X)`` call.  Only ``NotImplementedError`` and
+    ``TypeError`` are suppressed between the two attempts — these are the
+    documented cases where a particular ``shap.Explainer`` subclass does not
+    support one of the two call conventions.  All other exceptions (CUDA
+    errors, memory errors, SHAP API changes, incompatible model types, …) are
+    allowed to propagate so that the caller receives a meaningful traceback.
+
+    Parameters
+    ----------
+    explainer : shap.Explainer
+        A fitted SHAP explainer (e.g. ``shap.TreeExplainer``).
+    X : np.ndarray
+        The feature matrix to explain.
+
+    Returns
+    -------
+    np.ndarray
+        1-D array of mean absolute SHAP values, one entry per feature.
+
+    Raises
+    ------
+    RuntimeError
+        When both the modern and legacy SHAP call conventions fail, wrapping
+        the original exception with a descriptive message.
+    """
+    shap_values: Any
+
+    # --- Attempt 1: modern API -------------------------------------------
     try:
         explanation = explainer(X)
         shap_values = explanation.values
-    except Exception:
-        # Fallback to legacy shap_values call
+    except (NotImplementedError, TypeError) as _first_err:
+        # These two exceptions are the only ones that legitimately indicate
+        # "this explainer does not support the modern __call__ convention".
+        # Everything else (MemoryError, AttributeError, RuntimeError from
+        # CUDA, unexpected SHAP API changes, …) should propagate unchanged.
+        first_err = _first_err
+
+        # --- Attempt 2: legacy API ---------------------------------------
         try:
             shap_values = explainer.shap_values(X)
-        except Exception as e:
-            # Last fallback
-            legacy_explainer = shap.Explainer(explainer.model, X)
-            shap_values = legacy_explainer(X).values
+        except Exception as second_err:
+            raise RuntimeError(
+                "Both SHAP call conventions failed for explainer "
+                f"{type(explainer).__name__!r}.\n"
+                f"  Modern API error  : {type(first_err).__name__}: {first_err}\n"
+                f"  Legacy API error  : {type(second_err).__name__}: {second_err}\n"
+                "Check that the explainer and model types are compatible with "
+                "the installed version of the shap library."
+            ) from second_err
 
     # Handle various output shapes/types of SHAP
     if isinstance(shap_values, list):

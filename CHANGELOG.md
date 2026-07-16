@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`_extract_shap_importances`: eliminated silent exception swallowing** —
+  the previous implementation caught all exceptions with a bare `except
+  Exception: pass`, hiding SHAP API changes, CUDA errors, incompatible model
+  types, and `MemoryError`. The final fallback also re-created a second
+  `shap.Explainer(explainer.model, X)`, which only works for
+  `TreeExplainer`; any other explainer type would raise an opaque
+  `AttributeError` with no diagnostic information. The fix narrows the
+  caught exceptions between the two call conventions to only
+  `(NotImplementedError, TypeError)` — the only cases where a legitimate
+  API-convention mismatch occurs. When both the modern `explainer(X)` and
+  the legacy `explainer.shap_values(X)` calls fail, a `RuntimeError` is
+  raised with the explainer type, both original error messages, and
+  actionable guidance, chained via `raise … from` so the full traceback
+  is preserved.
 - **Input validation on hyperparameters** — previously, nonsensical hyperparameter
   combinations silently produced statistically meaningless or mathematically broken
   results. The following guards now raise `ValueError` with descriptive messages

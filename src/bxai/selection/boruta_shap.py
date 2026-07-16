@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import shap
 from sklearn.base import BaseEstimator, clone
+from sklearn.feature_selection import SelectorMixin
+from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import type_of_target
 import lightgbm as lgb
 from typing import Optional, List, Union, Any
@@ -96,7 +98,7 @@ def _extract_shap_importances(explainer: shap.Explainer, X: np.ndarray) -> np.nd
     return np.mean(np.abs(vals), axis=0)
 
 
-class BayesianBorutaSHAP(BaseEstimator):
+class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
     """Bayesian Boruta SHAP Feature Selection.
 
     Wrapper-selects features using tree-based models and SHAP values,
@@ -333,6 +335,32 @@ class BayesianBorutaSHAP(BaseEstimator):
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
 
         return self
+
+    # ------------------------------------------------------------------
+    # sklearn SelectorMixin interface
+    # ------------------------------------------------------------------
+
+    def get_support(self, indices: bool = False):
+        """Return a boolean mask or integer indices of the selected features.
+
+        Parameters
+        ----------
+        indices : bool, default False
+            If True, return integer indices rather than a boolean mask.
+
+        Returns
+        -------
+        support : np.ndarray of shape (n_features,)
+            Boolean mask, or integer indices when *indices* is True.
+        """
+        check_is_fitted(self, "support_")
+        if indices:
+            return np.where(self.support_)[0]
+        return self.support_
+
+    def _get_support_mask(self) -> np.ndarray:
+        """Required by SelectorMixin to power transform() / inverse_transform()."""
+        return self.get_support()
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of the features and their decisions."""

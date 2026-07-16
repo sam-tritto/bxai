@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.feature_selection import SelectorMixin
 from sklearn.metrics import get_scorer
 from typing import Optional, Union, Callable, Any
 
@@ -10,7 +11,7 @@ from bxai._utils.validation import check_consistent_length
 from bxai._engines.normal_ig import NormalIGTracker
 
 
-class BayesianPermutation(BaseEstimator):
+class BayesianPermutation(SelectorMixin, BaseEstimator):
     """Bayesian Permutation Feature Importance.
     
     A model-agnostic feature selection tool that computes a feature's actual
@@ -164,6 +165,32 @@ class BayesianPermutation(BaseEstimator):
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
 
         return self
+
+    # ------------------------------------------------------------------
+    # sklearn SelectorMixin interface
+    # ------------------------------------------------------------------
+
+    def get_support(self, indices: bool = False):
+        """Return a boolean mask or integer indices of the selected features.
+
+        Parameters
+        ----------
+        indices : bool, default False
+            If True, return integer indices rather than a boolean mask.
+
+        Returns
+        -------
+        support : np.ndarray of shape (n_features,)
+            Boolean mask, or integer indices when *indices* is True.
+        """
+        check_is_fitted(self, "support_")
+        if indices:
+            return np.where(self.support_)[0]
+        return self.support_
+
+    def _get_support_mask(self) -> np.ndarray:
+        """Required by SelectorMixin to power transform() / inverse_transform()."""
+        return self.get_support()
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of the features and their permutation decisions."""

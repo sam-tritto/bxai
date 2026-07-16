@@ -98,11 +98,34 @@ def _extract_shap_importances(explainer: shap.Explainer, X: np.ndarray) -> np.nd
 
 class BayesianBorutaSHAP(BaseEstimator):
     """Bayesian Boruta SHAP Feature Selection.
-    
+
     Wrapper-selects features using tree-based models and SHAP values,
     swapping frequentist p-values for Bayesian credible intervals.
     Supports discrete (Beta-Binomial) and continuous (Normal-Inverse-Gamma) modes
     with dynamic pruning of confirmed/rejected features for massive speedups.
+
+    .. rubric:: Design note — ``mode='continuous'`` convergence
+
+    In continuous mode each Boruta iteration produces a single scalar
+    ``diff = active_importance - max_shadow_importance`` per active feature.
+    That scalar is passed to :class:`~bxai._engines.normal_ig.NormalIGTracker`
+    as one observation, so the NIG posterior receives **exactly one data point
+    per feature per iteration**.
+
+    Consequences:
+
+    * The posterior variance (σ²) is estimated from the sample variance of
+      accumulated diffs.  With fewer than ~20–30 observations the sample
+      variance is highly unstable, so the Student-t HDI will be very wide and
+      decisions unreliable.
+    * This is in contrast to ``mode='discrete'``, where a single Bernoulli
+      hit/miss per iteration is sufficient for the Beta posterior to tighten
+      relatively quickly.
+
+    **Practical guidance**: set ``max_iter`` to at least 150–200 when using
+    ``mode='continuous'``.  Fewer iterations may leave many features
+    tentative because the HDI cannot exclude zero with sufficient
+    ``credible_mass``.
     """
 
     def __init__(
@@ -281,6 +304,16 @@ class BayesianBorutaSHAP(BaseEstimator):
                 )
             elif self.mode == "continuous":
                 diffs = active_importances - max_shadow
+                # NOTE: `diffs` is a 1-D array of length n_active.  The
+                # tracker reshapes it to (1, n_active), so each iteration
+                # contributes exactly ONE observation per feature to the NIG
+                # posterior.  The NIG variance estimate (σ²) is derived from
+                # the accumulated sample variance of these scalars; it is
+                # highly unstable until ~20–30 observations have been seen.
+                # As a result the Student-t HDI is very wide in early
+                # iterations and reliable decisions require significantly more
+                # iterations than discrete mode.  See the class docstring for
+                # guidance on choosing `max_iter` in continuous mode.
                 self.tracker_.update(diffs, tentative_indices)
                 self.status_ = self.tracker_.decide(
                     credible_mass=self.credible_mass,

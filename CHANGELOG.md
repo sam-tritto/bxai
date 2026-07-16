@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Corrected Highest Density Interval (HDI) computation and labeling** —
+  previously, `BARTImportance` and `ShrinkagePIP.summary()` calculated
+  equal-tailed percentile intervals using `np.percentile` but labelled them as
+  Highest Density Intervals (`hdi_lower` / `hdi_upper`). Since VIF and coefficient
+  distributions are often right-skewed or asymmetric, equal-tailed intervals and
+  true HDIs can differ meaningfully. We now utilize ArviZ's `hdi` to compute
+  the actual HDI when available, falling back to equal-tailed intervals when not,
+  and adding an `interval_type` column (valued `'hdi'` or `'ci'`) to the
+  summaries to ensure interval type clarity.
 - **`_extract_shap_importances`: eliminated silent exception swallowing** —
   the previous implementation caught all exceptions with a bare `except
   Exception: pass`, hiding SHAP API changes, CUDA errors, incompatible model

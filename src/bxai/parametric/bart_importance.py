@@ -5,6 +5,8 @@ from sklearn.base import BaseEstimator
 from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.validation import check_consistent_length
+from bxai._utils.hdi import compute_hdi
+
 
 
 def _decode_vi(s: str, length: int) -> List[int]:
@@ -34,11 +36,22 @@ def _decode_vi(s: str, length: int) -> List[int]:
 
 class BARTImportance(BaseEstimator):
     """BART-based feature importance and selection.
-    
+
     Fits a Bayesian Additive Regression Trees (BART) model using PyMC and
-    pymc-bart, extracts the posterior distribution of Variable Inclusion Frequencies
-    (VIF) by decoding tree split counts, and selects features whose lower HDI
-    boundary exceeds a baseline random-chance frequency.
+    pymc-bart, extracts the posterior distribution of Variable Inclusion
+    Frequencies (VIF) by decoding tree split counts, and selects features
+    whose lower HDI boundary exceeds a baseline random-chance frequency.
+
+    Interval computation
+    --------------------
+    The VIF distribution for important features is typically right-skewed
+    (many draws near ``1/n_features``, rare large values), so the equal-tailed
+    percentile interval and the true Highest Density Interval (HDI) can differ
+    meaningfully.  This class therefore uses :func:`arviz.hdi` — available as a
+    transitive dependency of PyMC — to compute the *true* HDI.  The fitted
+    attributes ``hdi_lower_`` and ``hdi_upper_`` store the genuine HDI
+    boundaries; the :meth:`summary` columns are labelled ``hdi_lower`` /
+    ``hdi_upper`` accordingly.
     """
 
     def __init__(
@@ -139,11 +152,12 @@ class BARTImportance(BaseEstimator):
         self.vif_mean_ = np.mean(self.vif_distribution_, axis=0)
         self.vif_std_ = np.std(self.vif_distribution_, axis=0)
 
-        # Compute Highest Density Interval (HDI) boundaries per feature
-        q_lower = (1.0 - self.credible_mass) / 2.0
-        q_upper = 1.0 - q_lower
-        self.hdi_lower_ = np.percentile(self.vif_distribution_, q_lower * 100, axis=0)
-        self.hdi_upper_ = np.percentile(self.vif_distribution_, q_upper * 100, axis=0)
+        # Compute the true Highest Density Interval (HDI) per feature.
+        # VIF distributions are right-skewed, so the equal-tailed percentile
+        # interval and the HDI can differ meaningfully.
+        self.hdi_lower_, self.hdi_upper_, self._interval_label = compute_hdi(
+            self.vif_distribution_, self.credible_mass
+        )
 
         # Select features whose lower HDI exceeds baseline random-chance frequency
         self.support_ = self.hdi_lower_ > self.baseline_threshold_
@@ -159,7 +173,15 @@ class BARTImportance(BaseEstimator):
         return self
 
     def summary(self) -> pd.DataFrame:
-        """Return a summary of Variable Inclusion Frequencies (VIFs) and selection decisions."""
+        """Return a summary of Variable Inclusion Frequencies (VIFs) and selection decisions.
+
+        The ``hdi_lower`` / ``hdi_upper`` columns contain the true Highest
+        Density Interval computed via :func:`arviz.hdi`.  In the rare case
+        where ArviZ is unavailable they fall back to an equal-tailed credible
+        interval, indicated by the ``interval_type`` column being ``'ci'``
+        rather than ``'hdi'``.
+        """
+        label = getattr(self, "_interval_label", "hdi")
         data = []
         for i, name in enumerate(self.feature_names_):
             data.append({
@@ -170,5 +192,6 @@ class BARTImportance(BaseEstimator):
                 "hdi_lower": self.hdi_lower_[i],
                 "hdi_upper": self.hdi_upper_[i],
                 "baseline_threshold": self.baseline_threshold_,
+                "interval_type": label,
             })
         return pd.DataFrame(data)

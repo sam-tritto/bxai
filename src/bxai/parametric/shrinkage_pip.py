@@ -5,6 +5,8 @@ from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.types import FeatureStatus
 from bxai._utils.validation import check_consistent_length
+from bxai._utils.hdi import compute_hdi
+
 
 
 class ShrinkagePIP(BaseEstimator):
@@ -260,8 +262,7 @@ class ShrinkagePIP(BaseEstimator):
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of feature coefficients, standard deviations, and PIPs."""
-        lower = np.percentile(self.beta_flat_, 2.5, axis=0)
-        upper = np.percentile(self.beta_flat_, 97.5, axis=0)
+        lower, upper, interval_type = compute_hdi(self.beta_flat_, 0.95)
 
         data = []
         for i, name in enumerate(self.feature_names_):
@@ -274,6 +275,7 @@ class ShrinkagePIP(BaseEstimator):
                 "std": self.coef_std_[i],
                 "hdi_lower": lower[i],
                 "hdi_upper": upper[i],
+                "interval_type": interval_type,
             }
             if self.pip_method_ == "kappa":
                 row["kappa_mean"] = self.kappa_mean_[i]

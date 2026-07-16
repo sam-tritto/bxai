@@ -33,6 +33,8 @@ def test_shrinkage_pip():
     assert isinstance(df_sum, pd.DataFrame)
     assert len(df_sum) == 3
     assert "pip" in df_sum.columns
+    assert "interval_type" in df_sum.columns
+    assert (df_sum["interval_type"] == "hdi").all()
 
 
 def test_bart_importance():
@@ -60,3 +62,5 @@ def test_bart_importance():
     assert isinstance(df_sum, pd.DataFrame)
     assert len(df_sum) == 3
     assert "vif_mean" in df_sum.columns
+    assert "interval_type" in df_sum.columns
+    assert (df_sum["interval_type"] == "hdi").all()

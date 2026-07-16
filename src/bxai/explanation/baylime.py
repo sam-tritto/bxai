@@ -4,42 +4,8 @@ from scipy import stats
 from typing import Optional, List, Dict, Tuple, Union, Callable, Any
 
 from bxai._utils.validation import check_array_2d
+from bxai._utils.hdi import compute_hdi
 
-
-def _compute_hdi(draws: np.ndarray, credible_mass: float) -> Tuple[np.ndarray, np.ndarray]:
-    """Compute HDI from posterior draws.
-
-    Tries to use ArviZ for proper HDI calculation. Falls back to
-    equal-tailed percentile intervals if ArviZ is not available.
-
-    Parameters
-    ----------
-    draws : np.ndarray
-        2D array of shape (n_draws, n_features).
-    credible_mass : float
-        The probability mass to cover.
-
-    Returns
-    -------
-    lower, upper : np.ndarray
-        Lower and upper bounds of shape (n_features,).
-    """
-    try:
-        import arviz as az
-        # Pass as 3D (1 chain, n_draws, n_features) -- unambiguous in current and
-        # future ArviZ versions, avoiding the (draw, shape) FutureWarning.
-        draws_3d = draws[np.newaxis, ...]  # shape: (1, n_draws, n_features)
-        hdi_result = az.hdi(draws_3d, hdi_prob=credible_mass)
-        return hdi_result[:, 0], hdi_result[:, 1]
-    except ImportError:
-        pass
-
-    # Fallback: equal-tailed interval
-    q_lower = (1.0 - credible_mass) / 2.0
-    q_upper = 1.0 - q_lower
-    lower = np.percentile(draws, q_lower * 100, axis=0)
-    upper = np.percentile(draws, q_upper * 100, axis=0)
-    return lower, upper
 
 
 class BayLIMEExplanation:
@@ -95,7 +61,7 @@ class BayLIMEExplanation:
         mass = credible_mass if credible_mass is not None else self.credible_mass
 
         if self.backend == "mcmc" and self.posterior_draws_ is not None:
-            lower, upper = _compute_hdi(self.posterior_draws_, mass)
+            lower, upper, _ = compute_hdi(self.posterior_draws_, mass)
         else:
             q_lower = (1.0 - mass) / 2.0
             q_upper = 1.0 - q_lower
@@ -487,7 +453,7 @@ class BayLIME:
         intercept_var = float(intercept_draws.var())
 
         # Pre-compute HDI at the requested credible mass
-        hdi_lower, hdi_upper = _compute_hdi(coef_flat, credible_mass=0.95)
+        hdi_lower, hdi_upper, _ = compute_hdi(coef_flat, credible_mass=0.95)
 
         return BayLIMEExplanation(
             feature_names=self.feature_names,

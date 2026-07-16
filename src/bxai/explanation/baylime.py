@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
+from sklearn.base import BaseEstimator
 from typing import Optional, List, Dict, Tuple, Union, Callable, Any
 
 from bxai._utils.validation import check_array_2d
@@ -152,7 +153,7 @@ class BayLIMEExplanation:
         return fig
 
 
-class BayLIME:
+class BayLIME(BaseEstimator):
     """BayLIME Local Surrogate Explainer.
 
     Generates stable, prior-informed local explanations for any black-box model
@@ -227,23 +228,14 @@ class BayLIME:
         progressbar: bool = False,
         random_state: Optional[int] = None,
     ):
-        if backend not in ("analytical", "mcmc"):
-            raise ValueError("backend must be 'analytical' or 'mcmc'")
-        if mcmc_prior not in ("normal", "horseshoe"):
-            raise ValueError("mcmc_prior must be 'normal' or 'horseshoe'")
-
-        self.training_data = check_array_2d(training_data)
-        self.n_features = self.training_data.shape[1]
-
-        if feature_names is not None:
-            if len(feature_names) != self.n_features:
-                raise ValueError(
-                    f"Length of feature_names ({len(feature_names)}) must match n_features ({self.n_features})"
-                )
-            self.feature_names = feature_names
-        else:
-            self.feature_names = [f"feature_{i}" for i in range(self.n_features)]
-
+        # sklearn convention: __init__ only assigns parameters to self.
+        # Validation and derived attributes live in _setup(), called lazily
+        # from explain_instance().  This keeps get_params() / set_params() /
+        # clone() working correctly — BaseEstimator.get_params() inspects the
+        # __init__ signature and expects each parameter name to map 1-to-1 to
+        # a same-named attribute without side-effects.
+        self.training_data = training_data
+        self.feature_names = feature_names
         self.kernel_width = kernel_width
         self.num_samples = num_samples
         self.prior_mean = prior_mean
@@ -256,9 +248,45 @@ class BayLIME:
         self.progressbar = progressbar
         self.random_state = random_state
 
-        # Feature scales computed once from training data
-        self.means_ = np.mean(self.training_data, axis=0)
-        self.stds_ = np.std(self.training_data, axis=0)
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _setup(self) -> None:
+        """Validate parameters and compute derived attributes.
+
+        Called from :meth:`explain_instance` the first time it is invoked so
+        that ``__init__`` remains a pure parameter-assignment method (required
+        for ``BaseEstimator.get_params`` / ``set_params`` / ``clone`` to work).
+        Subsequent calls are no-ops, so repeated :meth:`explain_instance` calls
+        incur no extra cost.
+        """
+        if hasattr(self, "_n_features"):
+            return  # already set up
+
+        if self.backend not in ("analytical", "mcmc"):
+            raise ValueError("backend must be 'analytical' or 'mcmc'")
+        if self.mcmc_prior not in ("normal", "horseshoe"):
+            raise ValueError("mcmc_prior must be 'normal' or 'horseshoe'")
+
+        training_data = check_array_2d(self.training_data)
+        self._n_features = training_data.shape[1]
+
+        feature_names = self.feature_names
+        if feature_names is not None:
+            if len(feature_names) != self._n_features:
+                raise ValueError(
+                    f"Length of feature_names ({len(feature_names)}) must match "
+                    f"n_features ({self._n_features})"
+                )
+            self._feature_names = list(feature_names)
+        else:
+            self._feature_names = [f"feature_{i}" for i in range(self._n_features)]
+
+        # Feature scales — computed once and reused by every explain_instance call
+        self._training_data = training_data
+        self.means_ = np.mean(training_data, axis=0)
+        self.stds_ = np.std(training_data, axis=0)
         self.stds_[self.stds_ == 0.0] = 1.0
 
     def _perturb(
@@ -268,7 +296,7 @@ class BayLIME:
         rng: np.random.Generator,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Generate local neighborhood and compute proximity weights."""
-        noise = rng.normal(0.0, noise_scale, size=(self.num_samples, self.n_features))
+        noise = rng.normal(0.0, noise_scale, size=(self.num_samples, self._n_features))
         Z = instance + noise * self.stds_
         Z[0] = instance  # anchor first sample to instance
 
@@ -287,7 +315,7 @@ class BayLIME:
         preds: np.ndarray,
     ) -> BayLIMEExplanation:
         """Closed-form weighted Bayesian linear regression backend."""
-        p = self.n_features
+        p = self._n_features
 
         # Augment with intercept column
         X = np.hstack([np.ones((len(Z), 1)), Z])
@@ -301,6 +329,7 @@ class BayLIME:
                     f"prior_mean length ({len(prior_m)}) must match n_features ({p})"
                 )
             mu_theta_0[1:] = prior_m
+
 
         # Prior precision matrix
         Sigma_0_inv = np.zeros((p + 1, p + 1))
@@ -331,7 +360,7 @@ class BayLIME:
         mu_n = Sigma_n @ (XTWy + Sigma_0_inv @ mu_theta_0)
 
         return BayLIMEExplanation(
-            feature_names=self.feature_names,
+            feature_names=self._feature_names,
             intercept_mean=float(mu_n[0]),
             intercept_var=float(Sigma_n[0, 0]),
             coef_mean=mu_n[1:],
@@ -366,7 +395,7 @@ class BayLIME:
                 "Install it with `pip install 'bxai[mcmc]'` or `uv sync --extra mcmc`."
             )
 
-        p = self.n_features
+        p = self._n_features
 
         # Build prior mean vector
         prior_mean_vec = np.zeros(p)
@@ -456,7 +485,7 @@ class BayLIME:
         hdi_lower, hdi_upper, _ = compute_hdi(coef_flat, credible_mass=0.95)
 
         return BayLIMEExplanation(
-            feature_names=self.feature_names,
+            feature_names=self._feature_names,
             intercept_mean=intercept_mean,
             intercept_var=intercept_var,
             coef_mean=coef_mean,
@@ -496,10 +525,12 @@ class BayLIME:
             Scale of Gaussian noise applied to generate the local neighborhood.
             Multiplied element-wise by the training data standard deviations.
         """
+        self._setup()
+
         instance = np.asarray(instance, dtype=float).ravel()
-        if len(instance) != self.n_features:
+        if len(instance) != self._n_features:
             raise ValueError(
-                f"Instance length ({len(instance)}) must match n_features ({self.n_features})"
+                f"Instance length ({len(instance)}) must match n_features ({self._n_features})"
             )
 
         rng = np.random.default_rng(self.random_state)

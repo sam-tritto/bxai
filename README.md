@@ -6,7 +6,7 @@
 
 # Bayesian Feature Attribution and XAI Suite
 
-A Python package implementing rigorous, computationally efficient Bayesian methods for feature selection and model explainability. The guiding principle is "Rigorous but Fast": leveraging closed-form analytical updates wherever possible to avoid the heavy computational drag of full MCMC simulations, while maintaining statistical integrity.
+A Python package implementing rigorous Bayesian methods for feature selection and model explainability. Where conjugate structure permits, bxai uses closed-form analytical updates (Beta-Binomial, Normal-Inverse-Gamma) to keep iteration fast. Where the model demands full posterior inference — Horseshoe GLMs, BART, and the optional MCMC path in BayLIME — it delegates to PyMC. The result is a unified toolkit that matches computational cost to statistical necessity.
 
 ## Features
 
@@ -15,7 +15,7 @@ A Python package implementing rigorous, computationally efficient Bayesian metho
   - `BayesianPermutation`: Model-agnostic importance tracking using paired validation loss drops updated via the Student-t continuous engine.
 
 - **Local Interpretability**
-  - `BayLIME`: Stable, prior-informed local explanations wrapping standard/custom perturbations in a closed-form Bayesian linear regression. Can be seeded with global SHAP weights from Phase 1.
+  - `BayLIME`: Stable, prior-informed local explanations wrapping standard/custom perturbations in a Bayesian linear regression. The default backend uses a closed-form analytical posterior; an optional `backend='mcmc'` path (requires `mcmc` extra) adds heteroscedastic noise and Horseshoe priors for richer uncertainty quantification. Can be seeded with global SHAP weights from Phase 1.
 
 - **Parametric & Native Bayesian Importance**
   - `ShrinkagePIP`: High-dimensional GLMs with Horseshoe and Lasso regularizing priors, tracking Posterior Inclusion Probabilities (PIP). Uses the posterior shrinkage factor κ_j = 1/(1+λ_j²τ²) for the Horseshoe prior (correct for continuous shrinkage distributions) and an auto-data-scaled |β_j| threshold for the Lasso (requires `mcmc` extra).

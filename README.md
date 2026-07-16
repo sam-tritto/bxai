@@ -1,6 +1,8 @@
 # bxai
 
-![bxai Logo](./assets/logo.png)
+<p align="center">
+  <img src="assets/logo.png" alt="bxai Logo" width="400"/>
+</p>
 
 Bayesian Feature Attribution and XAI Suite.
 

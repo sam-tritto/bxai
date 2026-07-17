@@ -1,4 +1,5 @@
 import base64
+import binascii
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -10,12 +11,38 @@ from bxai._utils.hdi import compute_hdi
 
 
 def _decode_vi(s: str, length: int) -> List[int]:
-    """Decode base64 string variable inclusion data back to split counts vector."""
+    """Decode a base64-encoded variable-inclusion string to a split-count vector.
+
+    Parameters
+    ----------
+    s : str
+        Base64-encoded payload produced by pymc-bart for one MCMC draw.
+    length : int
+        Expected number of features (= expected vector length).
+
+    Returns
+    -------
+    List[int]
+        Decoded split counts, one per feature.  If the decoded byte stream is
+        shorter than *length* the remaining entries are zero-padded (legitimate
+        for draws where some features had zero splits).
+
+    Raises
+    ------
+    ValueError
+        If *s* is not valid base64.  A corrupt or empty VIF entry must not
+        silently return a zero vector — that would bias ``vif_distribution_``
+        downward for the affected draw.  The caller is responsible for deciding
+        whether to skip the draw or surface the error.
+    """
     try:
         data = base64.b64decode(s)
-    except Exception:
-        return [0] * length
-        
+    except binascii.Error as exc:
+        raise ValueError(
+            f"_decode_vi: failed to decode base64 VIF entry "
+            f"(raw value={s!r}, length={length}): {exc}"
+        ) from exc
+
     result: List[int] = []
     i = 0
     while len(result) < length and i < len(data):
@@ -138,9 +165,24 @@ class BARTImportance(BaseEstimator):
         vi_xarray = self.trace_.sample_stats["variable_inclusion"]
         vi_vals = vi_xarray.values.ravel()
 
-        # Decode variable inclusion values to split counts
+        # Decode variable inclusion values to split counts.
         # shape: (n_draws * n_chains, n_features)
-        self.vif_raw_ = np.array([_decode_vi(val, n_features) for val in vi_vals])
+        #
+        # _decode_vi raises ValueError for corrupt / non-base64 entries rather
+        # than silently returning a zero vector (which would bias
+        # vif_distribution_ downward for the affected draw).  We re-raise with
+        # the draw index so the user knows exactly which MCMC sample is corrupt.
+        decoded: List[List[int]] = []
+        for draw_idx, val in enumerate(vi_vals):
+            try:
+                decoded.append(_decode_vi(val, n_features))
+            except ValueError as exc:
+                raise ValueError(
+                    f"BARTImportance.fit: corrupt variable-inclusion entry at "
+                    f"draw index {draw_idx} (of {len(vi_vals)} total draws). "
+                    f"Original error: {exc}"
+                ) from exc
+        self.vif_raw_ = np.array(decoded)
 
         # Normalize split frequencies per draw to compute VIF distribution
         row_sums = self.vif_raw_.sum(axis=1, keepdims=True)

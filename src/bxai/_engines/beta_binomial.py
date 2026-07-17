@@ -62,7 +62,17 @@ class BetaBinomialTracker:
         return stats.beta.sf(threshold, self.alpha, self.beta)
 
     def credible_interval(self, credible_mass: float = 0.95) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute the Highest Density / Equal-Tailed Credible Interval bounds."""
+        """Compute the Equal-Tailed Credible Interval (ETI) bounds.
+
+        .. note::
+            ``scipy.stats.beta.interval`` computes an *equal-tailed* interval
+            (i.e. ``(1-credible_mass)/2`` probability mass in each tail).  For
+            a symmetric distribution this coincides with the HDI, but the Beta
+            distribution is skewed whenever α ≠ β, so the ETI and HDI differ.
+            The summary columns produced from this interval are therefore
+            labelled ``ci_lower`` / ``ci_upper`` — **not** ``hdi_lower`` /
+            ``hdi_upper`` — to reflect their true statistical nature.
+        """
         if not (0.0 < credible_mass < 1.0):
             raise ValueError(
                 f"credible_mass must be in (0, 1); got {credible_mass!r}"

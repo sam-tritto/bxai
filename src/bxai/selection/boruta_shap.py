@@ -363,7 +363,22 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         return self.get_support()
 
     def summary(self) -> pd.DataFrame:
-        """Return a summary of the features and their decisions."""
+        """Return a summary of the features and their decisions.
+
+        Column notes
+        ------------
+        ``ci_lower`` / ``ci_upper`` (discrete mode)
+            Equal-tailed interval from :meth:`BetaBinomialTracker.credible_interval`
+            (``scipy.stats.beta.interval``).  The Beta posterior is skewed when
+            α ≠ β, so the equal-tailed interval and the HDI differ — these
+            columns are therefore **not** labelled as HDI.
+
+        ``hdi_lower`` / ``hdi_upper`` (continuous mode)
+            Equal-tailed interval from :meth:`NormalIGTracker.credible_interval`
+            (``scipy.stats.t.interval``).  The marginal Student-t posterior
+            for μ is symmetric, so the equal-tailed interval equals the HDI;
+            the ``hdi_*`` label is therefore accurate here.
+        """
         lower, upper = self.tracker_.credible_interval(self.credible_mass)
         
         data = []
@@ -376,6 +391,8 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 # Beta distribution mean: alpha / (alpha + beta)
                 mean_val = alpha_val / (alpha_val + beta_val)
                 raw_params = {"alpha": alpha_val, "beta": beta_val}
+                # Equal-tailed (not HDI) — Beta is skewed when α ≠ β
+                interval_keys = {"ci_lower": lower[i], "ci_upper": upper[i]}
             else:
                 mean_val = self.tracker_.mu[i]
                 raw_params = {
@@ -384,13 +401,14 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                     "alpha": self.tracker_.alpha[i],
                     "beta": self.tracker_.beta[i],
                 }
+                # Symmetric Student-t: equal-tailed == HDI
+                interval_keys = {"hdi_lower": lower[i], "hdi_upper": upper[i]}
                 
             data.append({
                 "feature": name,
                 "status": status.value,
                 "mean": mean_val,
-                "hdi_lower": lower[i],
-                "hdi_upper": upper[i],
+                **interval_keys,
                 **raw_params
             })
             

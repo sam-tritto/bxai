@@ -259,6 +259,8 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         ]
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
 
+        self.feature_importances_ = self.tracker_.mu
+
         return self
 
     # ------------------------------------------------------------------

@@ -226,6 +226,7 @@ class BayLIME(BaseEstimator):
         mcmc_tune: int = 500,
         mcmc_chains: int = 2,
         progressbar: bool = False,
+        perturbation_space: str = "feature_space",
         random_state: Optional[int] = None,
     ):
         # sklearn convention: __init__ only assigns parameters to self.
@@ -246,6 +247,7 @@ class BayLIME(BaseEstimator):
         self.mcmc_tune = mcmc_tune
         self.mcmc_chains = mcmc_chains
         self.progressbar = progressbar
+        self.perturbation_space = perturbation_space
         self.random_state = random_state
 
     # ------------------------------------------------------------------
@@ -272,6 +274,10 @@ class BayLIME(BaseEstimator):
             raise ValueError("backend must be 'analytical' or 'mcmc'")
         if self.mcmc_prior not in ("normal", "horseshoe"):
             raise ValueError("mcmc_prior must be 'normal' or 'horseshoe'")
+        if self.perturbation_space not in ("feature_space", "interpretable"):
+            raise ValueError(
+                f"perturbation_space must be 'feature_space' or 'interpretable'; got {self.perturbation_space!r}"
+            )
 
         training_data = check_array_2d(self.training_data)
         self._n_features = training_data.shape[1]
@@ -299,17 +305,50 @@ class BayLIME(BaseEstimator):
         instance: np.ndarray,
         noise_scale: float,
         rng: np.random.Generator,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Generate local neighborhood and compute proximity weights."""
-        noise = rng.normal(0.0, noise_scale, size=(self.num_samples, self._n_features))
-        Z = instance + noise * self.stds_
-        Z[0] = instance  # anchor first sample to instance
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Generate local neighborhood and compute proximity weights.
 
-        Z_normalized = (Z - instance) / self.stds_
+        Returns
+        -------
+        Z_prime : np.ndarray
+            The surrogate fitting inputs (binary mask for interpretable, same as Z for feature_space).
+        Z : np.ndarray
+            The black-box model inputs (original feature space).
+        proximity_weights : np.ndarray
+            Proximity weights for weighted linear regression.
+        distances : np.ndarray
+            Distance of each sample to the instance.
+        """
+        if self.perturbation_space == "interpretable":
+            Z_prime = rng.binomial(1, 0.5, size=(self.num_samples, self._n_features)).astype(float)
+            Z_prime[0] = 1.0  # Anchor first sample to all 1s (original instance)
+
+            # Perturbed values drawn from feature marginal normal distributions
+            Z_perturbed = rng.normal(
+                self.means_[np.newaxis, :],
+                self.stds_[np.newaxis, :],
+                size=(self.num_samples, self._n_features)
+            )
+
+            # Combine: original value if active (1.0), else perturbed value
+            Z = np.where(Z_prime == 1.0, instance[np.newaxis, :], Z_perturbed)
+            Z[0] = instance  # Force anchor to be exactly the original instance
+
+            # Distance is in binary space
+            Z_normalized = Z_prime - 1.0
+        else:
+            noise = rng.normal(0.0, noise_scale, size=(self.num_samples, self._n_features))
+            Z = instance + noise * self.stds_
+            Z[0] = instance  # anchor first sample to instance
+            Z_prime = Z.copy()
+
+            # Distance is in normalized feature space
+            Z_normalized = (Z - instance) / self.stds_
+
         distances = np.linalg.norm(Z_normalized, axis=1)
         proximity_weights = np.exp(-(distances ** 2) / (self.kernel_width ** 2))
 
-        return Z, proximity_weights, distances
+        return Z_prime, Z, proximity_weights, distances
 
     def _explain_analytical(
         self,
@@ -541,13 +580,13 @@ class BayLIME(BaseEstimator):
         rng = np.random.default_rng(self.random_state)
 
         # Generate local neighborhood and proximity weights
-        Z, proximity_weights, _ = self._perturb(instance, noise_scale, rng)
+        Z_prime, Z, proximity_weights, _ = self._perturb(instance, noise_scale, rng)
 
         # Obtain black-box predictions
         preds = predict_fn(Z)
         y = preds if preds.ndim == 1 else preds[:, label]
 
         if self.backend == "analytical":
-            return self._explain_analytical(Z, y, proximity_weights, instance, preds)
+            return self._explain_analytical(Z_prime, y, proximity_weights, instance, preds)
         else:
-            return self._explain_mcmc(Z, y, proximity_weights, instance, preds)
+            return self._explain_mcmc(Z_prime, y, proximity_weights, instance, preds)

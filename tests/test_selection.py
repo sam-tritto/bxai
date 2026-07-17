@@ -38,7 +38,7 @@ class TestBayesianBorutaSHAPDiscrete:
     # -----------------------------------------------------------------------
 
     def test_attributes_exist_after_fit(self, small_Xy):
-        """Fit must populate confirmed_, rejected_, tentative_, support_."""
+        """Fit must populate confirmed_, rejected_, tentative_, support_, feature_importances_."""
         X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42)
         selector.fit(X, y)
@@ -47,6 +47,27 @@ class TestBayesianBorutaSHAPDiscrete:
         assert hasattr(selector, "rejected_")
         assert hasattr(selector, "tentative_")
         assert isinstance(selector.confirmed_, list)
+        assert hasattr(selector, "feature_importances_")
+        assert len(selector.feature_importances_) == X.shape[1]
+
+    def test_iteration_history_populated(self, small_Xy):
+        """Fit must collect iteration history iteration-by-iteration."""
+        X, y = small_Xy
+        selector = BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42)
+        selector.fit(X, y)
+
+        assert hasattr(selector, "iteration_history_")
+        assert len(selector.iteration_history_) == selector.n_iterations_
+        
+        # Check first history entry structure
+        first_entry = selector.iteration_history_[0]
+        assert "iteration" in first_entry
+        assert first_entry["iteration"] == 1
+        assert "status" in first_entry
+        assert len(first_entry["status"]) == X.shape[1]
+        assert "alpha" in first_entry
+        assert "beta" in first_entry
+        assert len(first_entry["alpha"]) == X.shape[1]
 
     def test_summary_structure(self, small_Xy):
         """summary() must return a DataFrame with the expected columns and shape."""
@@ -201,6 +222,27 @@ class TestBayesianBorutaSHAPContinuous:
         df = selector.summary()
         assert "mu" in df.columns
 
+    def test_iteration_history_populated(self, small_Xy):
+        """Fit must collect iteration history iteration-by-iteration in continuous mode."""
+        X, y = small_Xy
+        selector = BayesianBorutaSHAP(mode="continuous", max_iter=3, random_state=42)
+        selector.fit(X, y)
+
+        assert hasattr(selector, "iteration_history_")
+        assert len(selector.iteration_history_) == selector.n_iterations_
+        
+        # Check first history entry structure
+        first_entry = selector.iteration_history_[0]
+        assert "iteration" in first_entry
+        assert first_entry["iteration"] == 1
+        assert "status" in first_entry
+        assert len(first_entry["status"]) == X.shape[1]
+        assert "mu" in first_entry
+        assert "nu" in first_entry
+        assert "alpha" in first_entry
+        assert "beta" in first_entry
+        assert len(first_entry["mu"]) == X.shape[1]
+
     # -----------------------------------------------------------------------
     # Credible-interval ordering
     # -----------------------------------------------------------------------
@@ -302,7 +344,7 @@ class TestBayesianPermutation:
     # -----------------------------------------------------------------------
 
     def test_attributes_exist_after_fit(self, small_Xy, small_rf):
-        """Fit must populate confirmed_, rejected_, tentative_."""
+        """Fit must populate confirmed_, rejected_, tentative_, feature_importances_."""
         X, y = small_Xy
         selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=5, random_state=42)
@@ -310,6 +352,8 @@ class TestBayesianPermutation:
 
         assert hasattr(selector, "confirmed_")
         assert hasattr(selector, "rejected_")
+        assert hasattr(selector, "feature_importances_")
+        assert len(selector.feature_importances_) == X.shape[1]
 
     def test_summary_structure(self, small_Xy, small_rf):
         """summary() must return a 6-row DataFrame with the expected columns."""
@@ -444,3 +488,36 @@ class TestBayesianPermutation:
             f"Informative features (idx 0,1) must have positive mean score drop; "
             f"got {mean_informative:.4f}"
         )
+
+
+def test_pipeline_integration(small_Xy, small_rf):
+    from sklearn.pipeline import Pipeline
+    X, y = small_Xy
+
+    # Test BayesianBorutaSHAP pipeline integration
+    pipe_boruta = Pipeline([
+        ('selector', BayesianBorutaSHAP(mode='discrete', max_iter=3, random_state=42))
+    ])
+    pipe_boruta.fit(X, y)
+    X_trans = pipe_boruta.transform(X)
+    assert X_trans.shape[0] == X.shape[0]
+
+    # Force all features to be selected to verify non-empty transform
+    selector_boruta = pipe_boruta.named_steps['selector']
+    selector_boruta.support_ = np.ones(X.shape[1], dtype=bool)
+    X_trans_all = selector_boruta.transform(X)
+    assert X_trans_all.shape == X.shape
+
+    # Test BayesianPermutation pipeline integration
+    pipe_perm = Pipeline([
+        ('selector', BayesianPermutation(model=small_rf, scoring='accuracy', n_repeats=3, random_state=42))
+    ])
+    pipe_perm.fit(X, y)
+    X_trans_perm = pipe_perm.transform(X)
+    assert X_trans_perm.shape[0] == X.shape[0]
+
+    # Force all features to be selected to verify non-empty transform
+    selector_perm = pipe_perm.named_steps['selector']
+    selector_perm.support_ = np.ones(X.shape[1], dtype=bool)
+    X_trans_all_perm = selector_perm.transform(X)
+    assert X_trans_all_perm.shape == X.shape

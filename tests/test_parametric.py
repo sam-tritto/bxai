@@ -233,6 +233,8 @@ class TestShrinkagePIPIntegration:
         assert hasattr(sel, "tentative_")
         # Parametric models have no tentative state
         assert sel.tentative_ == []
+        assert hasattr(sel, "feature_importances_")
+        assert sel.feature_importances_.shape == (self._P,)
 
     def test_fit_populates_coef_mean_and_std(self):
         """coef_mean_ and coef_std_ must have shape (n_features,)."""
@@ -533,6 +535,8 @@ class TestBARTImportanceIntegration:
         assert hasattr(bi, "confirmed_")
         assert hasattr(bi, "rejected_")
         assert bi.tentative_ == []
+        assert hasattr(bi, "feature_importances_")
+        assert bi.feature_importances_.shape == (self._P,)
 
     def test_fit_with_dataframe_uses_column_names(self):
         """When X is a DataFrame, feature_names_ must equal its columns."""
@@ -694,3 +698,63 @@ class TestBARTImportanceIntegration:
             f"Expected feature 0 to have the highest VIF; got argmax={np.argmax(bi.vif_mean_)}.\n"
             f"vif_mean_={bi.vif_mean_}"
         )
+
+    def test_classification_mcmc(self):
+        """fit() in classification mode must successfully sample and run selection."""
+        y_bin = (self._X[:, 0] > 0.0).astype(int)
+        bi = BARTImportance(
+            model_type="classification",
+            n_trees=3,
+            n_samples=100,
+            tune=100,
+            chains=1,
+            random_state=42,
+        )
+        bi.fit(self._X, y_bin)
+
+        assert hasattr(bi, "vif_mean_")
+        assert bi.vif_mean_.shape == (self._P,)
+        assert hasattr(bi, "support_")
+        assert bi.support_.shape == (self._P,)
+        assert hasattr(bi, "feature_importances_")
+        assert len(bi.feature_importances_) == self._P
+        
+        # Test summary
+        df = bi.summary()
+        assert len(df) == self._P
+        assert "selected" in df.columns
+
+
+def test_parametric_pipeline_integration():
+    from sklearn.pipeline import Pipeline
+    # Generate some toy data
+    X = np.random.randn(50, 4)
+    y = np.random.randint(0, 2, size=50)
+
+    # Test ShrinkagePIP pipeline integration
+    pipe_pip = Pipeline([
+        ('selector', ShrinkagePIP(n_samples=50, tune=50, chains=1, random_state=42, progressbar=False))
+    ])
+    pipe_pip.fit(X, y)
+    X_trans = pipe_pip.transform(X)
+    assert X_trans.shape[0] == X.shape[0]
+
+    # Force all features to be selected to verify non-empty transform
+    selector_pip = pipe_pip.named_steps['selector']
+    selector_pip.support_ = np.ones(X.shape[1], dtype=bool)
+    X_trans_all = selector_pip.transform(X)
+    assert X_trans_all.shape == X.shape
+
+    # Test BARTImportance pipeline integration
+    pipe_bart = Pipeline([
+        ('selector', BARTImportance(n_trees=3, n_samples=50, tune=50, chains=1, random_state=42, progressbar=False))
+    ])
+    pipe_bart.fit(X, y)
+    X_trans_bart = pipe_bart.transform(X)
+    assert X_trans_bart.shape[0] == X.shape[0]
+
+    # Force all features to be selected to verify non-empty transform
+    selector_bart = pipe_bart.named_steps['selector']
+    selector_bart.support_ = np.ones(X.shape[1], dtype=bool)
+    X_trans_all_bart = selector_bart.transform(X)
+    assert X_trans_all_bart.shape == X.shape

@@ -30,10 +30,10 @@ Install using `uv`:
 uv add bxai
 ```
 
-Or install with optional dependencies (e.g., PyMC for MCMC methods, catboost, xgboost):
+Or install with optional dependencies (e.g., SHAP/LightGBM for Boruta, PyMC for MCMC methods, catboost, xgboost):
 
 ```bash
-uv add bxai --optional mcmc --optional xgboost --optional catboost
+uv add bxai --optional boruta --optional mcmc --optional xgboost --optional catboost
 ```
 
 ## Quick Start

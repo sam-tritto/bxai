@@ -1,12 +1,10 @@
 import warnings
 import numpy as np
 import pandas as pd
-import shap
 from sklearn.base import BaseEstimator, clone
 from sklearn.feature_selection import SelectorMixin
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import type_of_target
-import lightgbm as lgb
 from typing import Optional, List, Union, Any
 
 from bxai._utils.types import FeatureStatus
@@ -17,6 +15,13 @@ from bxai._engines.normal_ig import NormalIGTracker
 
 def _default_model(y: np.ndarray) -> Any:
     """Instantiate a default LightGBM model based on target type."""
+    try:
+        import lightgbm as lgb
+    except ImportError:
+        raise ImportError(
+            "lightgbm is required to use the default model in BayesianBorutaSHAP. "
+            "Install it using `pip install 'bxai[boruta]'` or pass a custom fitted model."
+        )
     target_type = type_of_target(y)
     if target_type in ("binary", "multiclass"):
         return lgb.LGBMClassifier(verbosity=-1)
@@ -24,7 +29,7 @@ def _default_model(y: np.ndarray) -> Any:
         return lgb.LGBMRegressor(verbosity=-1)
 
 
-def _extract_shap_importances(explainer: shap.Explainer, X: np.ndarray) -> np.ndarray:
+def _extract_shap_importances(explainer: Any, X: np.ndarray) -> np.ndarray:
     """Extract feature importances as mean absolute SHAP values.
 
     Tries the modern ``explainer(X)`` API first, then falls back to the legacy
@@ -257,6 +262,13 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         y : array-like
             Target vector.
         """
+        try:
+            import shap
+        except ImportError:
+            raise ImportError(
+                "shap is required to use BayesianBorutaSHAP. "
+                "Install it using `pip install 'bxai[boruta]'`."
+            )
         self._validate_hyperparams()
         X_arr, y_arr = check_consistent_length(X, y)
         n_samples, n_features = X_arr.shape
@@ -300,15 +312,16 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
 
         self.status_ = np.full(n_features, FeatureStatus.TENTATIVE, dtype=object)
         self.n_iterations_ = 0
+        self.iteration_history_ = []
 
         # Loop until max iterations or all features decided
         for iteration in range(1, self.max_iter + 1):
-            self.n_iterations_ = iteration
-            
             # Check tentative mask
             tentative_mask = self.status_ == FeatureStatus.TENTATIVE
             if not np.any(tentative_mask):
                 break
+
+            self.n_iterations_ = iteration
 
             tentative_indices = np.where(tentative_mask)[0]
             n_active = len(tentative_indices)
@@ -367,6 +380,21 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                     threshold=0.0,
                 )
 
+            # Record history
+            hist_entry = {
+                "iteration": iteration,
+                "status": self.status_.copy(),
+            }
+            if self.mode == "discrete":
+                hist_entry["alpha"] = self.tracker_.alpha.copy()
+                hist_entry["beta"] = self.tracker_.beta.copy()
+            else:
+                hist_entry["mu"] = self.tracker_.mu.copy()
+                hist_entry["nu"] = self.tracker_.nu.copy()
+                hist_entry["alpha"] = self.tracker_.alpha.copy()
+                hist_entry["beta"] = self.tracker_.beta.copy()
+            self.iteration_history_.append(hist_entry)
+
         # Compile final results
         self.confirmed_ = [
             self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.CONFIRMED
@@ -378,6 +406,11 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.TENTATIVE
         ]
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
+
+        if self.mode == "discrete":
+            self.feature_importances_ = self.tracker_.alpha / (self.tracker_.alpha + self.tracker_.beta)
+        else:
+            self.feature_importances_ = self.tracker_.mu
 
         return self
 

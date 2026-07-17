@@ -3,6 +3,8 @@ import binascii
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.feature_selection import SelectorMixin
+from sklearn.utils.validation import check_is_fitted
 from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.validation import check_consistent_length
@@ -61,7 +63,7 @@ def _decode_vi(s: str, length: int) -> List[int]:
     return result[:length]
 
 
-class BARTImportance(BaseEstimator):
+class BARTImportance(SelectorMixin, BaseEstimator):
     """BART-based feature importance and selection.
 
     Fits a Bayesian Additive Regression Trees (BART) model using PyMC and
@@ -83,6 +85,7 @@ class BARTImportance(BaseEstimator):
 
     def __init__(
         self,
+        model_type: str = "regression",
         n_trees: int = 50,
         n_samples: int = 1000,
         tune: int = 1000,
@@ -92,6 +95,7 @@ class BARTImportance(BaseEstimator):
         progressbar: bool = False,
         random_state: Optional[int] = None,
     ):
+        self.model_type = model_type
         self.n_trees = n_trees
         self.n_samples = n_samples
         self.tune = tune
@@ -107,6 +111,10 @@ class BARTImportance(BaseEstimator):
 
     def _validate_hyperparams(self) -> None:
         """Raise ValueError for any hyperparameter combination that is statistically invalid."""
+        if self.model_type not in ("regression", "classification"):
+            raise ValueError(
+                f"model_type must be either 'regression' or 'classification'; got {self.model_type!r}"
+            )
         if not (0.0 < self.credible_mass < 1.0):
             raise ValueError(
                 f"credible_mass must be in (0, 1); got {self.credible_mass!r}"
@@ -148,9 +156,30 @@ class BARTImportance(BaseEstimator):
 
         with pm.Model() as model:
             # Fit BART model
-            mu = pmb.BART("mu", X_arr, y_arr, m=self.n_trees)
-            sigma = pm.HalfNormal("sigma", sigma=np.std(y_arr) if len(y_arr) > 0 else 1.0)
-            pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_arr)
+            if self.model_type == "regression":
+                mu = pmb.BART("mu", X_arr, y_arr, m=self.n_trees)
+                sigma = pm.HalfNormal("sigma", sigma=np.std(y_arr) if len(y_arr) > 0 else 1.0)
+                pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_arr)
+            elif self.model_type == "classification":
+                from sklearn.utils.multiclass import type_of_target
+                target_type = type_of_target(y_arr)
+                if target_type != "binary":
+                    raise ValueError(
+                        f"BARTImportance in classification mode requires a binary target; "
+                        f"got target type {target_type!r}"
+                    )
+                # Map binary targets to 0 and 1
+                unique_y = np.unique(y_arr)
+                if not set(unique_y).issubset({0, 1}):
+                    y_arr = (y_arr == unique_y[1]).astype(int)
+
+                mu = pmb.BART("mu", X_arr, y_arr, m=self.n_trees)
+                p = pm.Deterministic("p", pm.math.invprobit(mu))
+                pm.Bernoulli("y_obs", p=p, observed=y_arr)
+            else:
+                raise ValueError(
+                    f"model_type must be either 'regression' or 'classification'; got {self.model_type!r}"
+                )
 
             self.trace_ = pm.sample(
                 draws=self.n_samples,
@@ -213,7 +242,35 @@ class BARTImportance(BaseEstimator):
         ]
         self.tentative_ = []
 
+        self.feature_importances_ = self.vif_mean_
+
         return self
+
+    # ------------------------------------------------------------------
+    # sklearn SelectorMixin interface
+    # ------------------------------------------------------------------
+
+    def get_support(self, indices: bool = False):
+        """Return a boolean mask or integer indices of the selected features.
+
+        Parameters
+        ----------
+        indices : bool, default False
+            If True, return integer indices rather than a boolean mask.
+
+        Returns
+        -------
+        support : np.ndarray of shape (n_features,)
+            Boolean mask, or integer indices when *indices* is True.
+        """
+        check_is_fitted(self, "support_")
+        if indices:
+            return np.where(self.support_)[0]
+        return self.support_
+
+    def _get_support_mask(self) -> np.ndarray:
+        """Required by SelectorMixin to power transform() / inverse_transform()."""
+        return self.get_support()
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of Variable Inclusion Frequencies (VIFs) and selection decisions.

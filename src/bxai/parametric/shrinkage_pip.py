@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.feature_selection import SelectorMixin
+from sklearn.utils.validation import check_is_fitted
 from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.types import FeatureStatus
@@ -9,7 +11,7 @@ from bxai._utils.hdi import compute_hdi, HDI_LABEL
 
 
 
-class ShrinkagePIP(BaseEstimator):
+class ShrinkagePIP(SelectorMixin, BaseEstimator):
     """Shrinkage Prior (Horseshoe or Lasso) Feature Selection for GLMs.
 
     Fits a linear or logistic regression model regularized with a Horseshoe or
@@ -258,7 +260,35 @@ class ShrinkagePIP(BaseEstimator):
         ]
         self.tentative_ = []  # Parametric shrinkage models have no tentative state
 
+        self.feature_importances_ = self.pip_
+
         return self
+
+    # ------------------------------------------------------------------
+    # sklearn SelectorMixin interface
+    # ------------------------------------------------------------------
+
+    def get_support(self, indices: bool = False):
+        """Return a boolean mask or integer indices of the selected features.
+
+        Parameters
+        ----------
+        indices : bool, default False
+            If True, return integer indices rather than a boolean mask.
+
+        Returns
+        -------
+        support : np.ndarray of shape (n_features,)
+            Boolean mask, or integer indices when *indices* is True.
+        """
+        check_is_fitted(self, "support_")
+        if indices:
+            return np.where(self.support_)[0]
+        return self.support_
+
+    def _get_support_mask(self) -> np.ndarray:
+        """Required by SelectorMixin to power transform() / inverse_transform()."""
+        return self.get_support()
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of feature coefficients, standard deviations, and PIPs."""

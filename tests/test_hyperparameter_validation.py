@@ -458,3 +458,15 @@ class TestBARTImportanceValidation:
         selector = BARTImportance(credible_mass=-0.5)
         with pytest.raises(ValueError, match="credible_mass must be in"):
             selector.fit(X, y)
+
+    def test_model_type_invalid_raises(self):
+        X, y = self._make_data()
+        selector = BARTImportance(model_type="invalid")
+        with pytest.raises(ValueError, match="model_type must be either"):
+            selector.fit(X, y)
+
+    def test_model_type_classification_with_continuous_y_raises(self):
+        X, y = self._make_data()
+        selector = BARTImportance(model_type="classification")
+        with pytest.raises(ValueError, match="requires a binary target"):
+            selector.fit(X, y)

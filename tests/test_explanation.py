@@ -130,6 +130,13 @@ def test_baylime_analytical_bad_backend():
         explainer.explain_instance(np.zeros(4), linear_predict, label=0)
 
 
+def test_baylime_analytical_bad_perturbation_space():
+    training_data = make_data()
+    explainer = BayLIME(training_data=training_data, perturbation_space="invalid")
+    with pytest.raises(ValueError, match="perturbation_space must be"):
+        explainer.explain_instance(np.zeros(4), linear_predict, label=0)
+
+
 def test_baylime_analytical_bad_mcmc_prior():
     training_data = make_data()
     explainer = BayLIME(training_data=training_data, mcmc_prior="unsupported")
@@ -338,3 +345,47 @@ def test_baylime_stds_zero_clamped():
     )
     assert explainer.stds_[1] > 0.0
     assert explainer.stds_[2] > 0.0
+
+
+def test_baylime_interpretable_perturbation_analytical():
+    """Verify BayLIME generates valid local surrogate explanations when using interpretable perturbation mode (analytical backend)."""
+    training_data = make_data()
+    explainer = BayLIME(
+        training_data=training_data,
+        num_samples=100,
+        backend="analytical",
+        perturbation_space="interpretable",
+        random_state=42,
+    )
+    instance = np.random.randn(4)
+    explanation = explainer.explain_instance(instance, linear_predict, label=0)
+    
+    assert isinstance(explanation, BayLIMEExplanation)
+    assert len(explanation.coef_mean) == 4
+    assert explanation.coef_cov.shape == (4, 4)
+    assert explanation.backend == "analytical"
+
+
+@_slow
+@_mcmc
+def test_baylime_interpretable_perturbation_mcmc():
+    """Verify BayLIME generates valid local surrogate explanations when using interpretable perturbation mode (MCMC backend)."""
+    training_data = make_data()
+    explainer = BayLIME(
+        training_data=training_data,
+        num_samples=100,
+        backend="mcmc",
+        perturbation_space="interpretable",
+        mcmc_samples=100,
+        mcmc_tune=100,
+        mcmc_chains=1,
+        random_state=42,
+    )
+    instance = np.random.randn(4)
+    explanation = explainer.explain_instance(instance, linear_predict, label=0)
+    
+    assert isinstance(explanation, BayLIMEExplanation)
+    assert len(explanation.coef_mean) == 4
+    assert explanation.coef_cov.shape == (4, 4)
+    assert explanation.backend == "mcmc"
+    assert explanation.posterior_draws_.shape == (100, 4)

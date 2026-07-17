@@ -133,6 +133,10 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
             raise ValueError(
                 f"prior_beta must be > 0 for a valid NIG prior; got {self.prior_beta!r}"
             )
+        if self.prior_nu <= 0:
+            raise ValueError(
+                f"prior_nu must be > 0 for a valid NIG prior; got {self.prior_nu!r}"
+            )
 
     def fit(self, X: Any, y: Any) -> "BayesianPermutation":
         """Compute the Bayesian Permutation Importance of features in X.
@@ -283,9 +287,18 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         """Required by SelectorMixin to power transform() / inverse_transform()."""
         return self.get_support()
 
-    def summary(self) -> pd.DataFrame:
-        """Return a summary of the features and their permutation decisions."""
-        lower, upper = self.tracker_.credible_interval(self.credible_mass)
+    def summary(self, credible_mass: Optional[float] = None) -> pd.DataFrame:
+        """Return a summary of the features and their permutation decisions.
+
+        Parameters
+        ----------
+        credible_mass : float or None, optional
+            The probability mass to include in the credible interval
+            (must be in ``(0, 1)``).  When ``None`` (default), falls back to
+            the ``credible_mass`` value supplied at construction time.
+        """
+        mass = credible_mass if credible_mass is not None else self.credible_mass
+        lower, upper = self.tracker_.credible_interval(mass)
         
         data = []
         for i, name in enumerate(self.feature_names_):

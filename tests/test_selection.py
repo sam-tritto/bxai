@@ -62,6 +62,39 @@ class TestBayesianBorutaSHAPDiscrete:
         assert "hdi_upper" in df.columns
 
     # -----------------------------------------------------------------------
+    # credible_mass override
+    # -----------------------------------------------------------------------
+
+    def test_summary_credible_mass_override_produces_narrower_interval(self):
+        """Passing a smaller credible_mass to summary() must yield narrower intervals."""
+        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
+                                    n_redundant=0, random_state=42)
+        selector = BayesianBorutaSHAP(mode="discrete", max_iter=5, random_state=42)
+        selector.fit(X, y)
+
+        df_wide   = selector.summary(credible_mass=0.95)
+        df_narrow = selector.summary(credible_mass=0.50)
+
+        widths_wide   = df_wide["ci_upper"].values   - df_wide["ci_lower"].values
+        widths_narrow = df_narrow["ci_upper"].values - df_narrow["ci_lower"].values
+        assert (widths_narrow < widths_wide).all(), (
+            "A smaller credible_mass must yield strictly narrower credible intervals."
+        )
+
+    def test_summary_default_equals_constructor_credible_mass(self):
+        """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
+        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
+                                    n_redundant=0, random_state=42)
+        selector = BayesianBorutaSHAP(mode="discrete", max_iter=5,
+                                       credible_mass=0.90, random_state=42)
+        selector.fit(X, y)
+
+        df_default  = selector.summary()
+        df_explicit = selector.summary(credible_mass=0.90)
+
+        pd.testing.assert_frame_equal(df_default, df_explicit)
+
+    # -----------------------------------------------------------------------
     # Credible-interval ordering
     # -----------------------------------------------------------------------
 
@@ -305,8 +338,44 @@ class TestBayesianPermutation:
         assert "hdi_lower" in df.columns
 
     # -----------------------------------------------------------------------
-    # Credible-interval ordering
+    # credible_mass override
     # -----------------------------------------------------------------------
+
+    def test_summary_credible_mass_override_produces_narrower_interval(self):
+        """Passing a smaller credible_mass to summary() must yield narrower intervals."""
+        X, y = make_classification(n_samples=100, n_features=4, n_informative=2,
+                                    n_redundant=0, random_state=42)
+        model = RandomForestClassifier(n_estimators=10, random_state=42)
+        model.fit(X, y)
+
+        selector = BayesianPermutation(model=model, scoring="accuracy",
+                                        n_repeats=10, random_state=42)
+        selector.fit(X, y)
+
+        df_wide   = selector.summary(credible_mass=0.95)
+        df_narrow = selector.summary(credible_mass=0.50)
+
+        widths_wide   = df_wide["hdi_upper"].values   - df_wide["hdi_lower"].values
+        widths_narrow = df_narrow["hdi_upper"].values - df_narrow["hdi_lower"].values
+        assert (widths_narrow < widths_wide).all(), (
+            "A smaller credible_mass must yield strictly narrower credible intervals."
+        )
+
+    def test_summary_default_equals_constructor_credible_mass(self):
+        """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
+        X, y = make_classification(n_samples=50, n_features=4, n_informative=2,
+                                    n_redundant=0, random_state=42)
+        model = RandomForestClassifier(n_estimators=5, random_state=42)
+        model.fit(X, y)
+
+        selector = BayesianPermutation(model=model, scoring="accuracy",
+                                        n_repeats=5, credible_mass=0.90, random_state=42)
+        selector.fit(X, y)
+
+        df_default  = selector.summary()
+        df_explicit = selector.summary(credible_mass=0.90)
+
+        pd.testing.assert_frame_equal(df_default, df_explicit)
 
     def test_hdi_lower_less_than_upper(self):
         """hdi_lower < hdi_upper must hold for every feature."""

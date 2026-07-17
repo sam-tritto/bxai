@@ -228,6 +228,128 @@ class TestBayesianBorutaSHAPValidation:
         with pytest.raises(ValueError, match="prior_beta_continuous must be > 0"):
             selector.fit(X, y)
 
+    def test_prior_nu_zero_raises(self):
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(prior_nu=0.0, mode="continuous", max_iter=1)
+        with pytest.raises(ValueError, match="prior_nu must be > 0"):
+            selector.fit(X, y)
+
+    def test_prior_nu_negative_raises(self):
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(prior_nu=-1e-4, mode="continuous", max_iter=1)
+        with pytest.raises(ValueError, match="prior_nu must be > 0"):
+            selector.fit(X, y)
+
+
+# ---------------------------------------------------------------------------
+# BayesianBorutaSHAP — cross-mode unused-parameter warnings
+# ---------------------------------------------------------------------------
+
+class TestBayesianBorutaSHAPCrossModeWarnings:
+    """Verify that mode-irrelevant prior parameters trigger UserWarnings."""
+
+    def _make_data(self):
+        return make_classification(n_samples=30, n_features=4, n_informative=2, random_state=0)
+
+    # -- continuous mode warned about discrete priors ----------------------
+
+    def test_continuous_mode_warns_on_prior_alpha(self):
+        """prior_alpha has no effect in continuous mode → UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="continuous", prior_alpha=2.0, max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("prior_alpha" in m for m in messages), (
+            f"Expected a UserWarning mentioning 'prior_alpha'; got: {messages}"
+        )
+
+    def test_continuous_mode_warns_on_prior_beta(self):
+        """prior_beta has no effect in continuous mode → UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="continuous", prior_beta=3.0, max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("prior_beta" in m for m in messages), (
+            f"Expected a UserWarning mentioning 'prior_beta'; got: {messages}"
+        )
+
+    def test_continuous_mode_warns_on_multiple_discrete_priors(self):
+        """Both prior_alpha and prior_beta non-default → single warning listing both."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="continuous", prior_alpha=2.0, prior_beta=0.5, max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("prior_alpha" in m and "prior_beta" in m for m in messages), (
+            f"Expected a single UserWarning mentioning both priors; got: {messages}"
+        )
+
+    # -- discrete mode warned about NIG priors -----------------------------
+
+    def test_discrete_mode_warns_on_prior_nu(self):
+        """prior_nu has no effect in discrete mode → UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="discrete", prior_nu=1.0, max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("prior_nu" in m for m in messages), (
+            f"Expected a UserWarning mentioning 'prior_nu'; got: {messages}"
+        )
+
+    def test_discrete_mode_warns_on_prior_alpha_continuous(self):
+        """prior_alpha_continuous has no effect in discrete mode → UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="discrete", prior_alpha_continuous=1.0, max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("prior_alpha_continuous" in m for m in messages), (
+            f"Expected a UserWarning mentioning 'prior_alpha_continuous'; got: {messages}"
+        )
+
+    # -- all defaults → no cross-mode warning ------------------------------
+
+    def test_no_warning_with_defaults_discrete(self):
+        """Default parameters in discrete mode must not produce any UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="discrete", max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        cross_mode = [w for w in caught if issubclass(w.category, UserWarning)
+                      and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))]
+        assert not cross_mode, (
+            f"Unexpected cross-mode UserWarning with default parameters: {cross_mode}"
+        )
+
+    def test_no_warning_with_defaults_continuous(self):
+        """Default parameters in continuous mode must not produce any UserWarning."""
+        import warnings
+        X, y = self._make_data()
+        selector = BayesianBorutaSHAP(mode="continuous", max_iter=1)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            selector.fit(X, y)
+        cross_mode = [w for w in caught if issubclass(w.category, UserWarning)
+                      and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))]
+        assert not cross_mode, (
+            f"Unexpected cross-mode UserWarning with default parameters: {cross_mode}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # BayesianPermutation — estimator-level guards
@@ -274,6 +396,18 @@ class TestBayesianPermutationValidation:
         rf, X, y = self._make_fitted_model()
         selector = BayesianPermutation(model=rf, scoring="accuracy", prior_beta=-1.0)
         with pytest.raises(ValueError, match="prior_beta must be > 0"):
+            selector.fit(X, y)
+
+    def test_prior_nu_zero_raises(self):
+        rf, X, y = self._make_fitted_model()
+        selector = BayesianPermutation(model=rf, scoring="accuracy", prior_nu=0.0)
+        with pytest.raises(ValueError, match="prior_nu must be > 0"):
+            selector.fit(X, y)
+
+    def test_prior_nu_negative_raises(self):
+        rf, X, y = self._make_fitted_model()
+        selector = BayesianPermutation(model=rf, scoring="accuracy", prior_nu=-1e-4)
+        with pytest.raises(ValueError, match="prior_nu must be > 0"):
             selector.fit(X, y)
 
 

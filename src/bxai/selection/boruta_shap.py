@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 import shap
@@ -201,6 +202,50 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 f"prior_beta_continuous must be > 0 for a valid NIG prior; "
                 f"got {self.prior_beta_continuous!r}"
             )
+        if self.prior_nu <= 0:
+            raise ValueError(
+                f"prior_nu must be > 0 for a valid NIG prior; got {self.prior_nu!r}"
+            )
+        # ------------------------------------------------------------------
+        # Cross-mode unused-parameter warnings
+        # ------------------------------------------------------------------
+        _DISCRETE_DEFAULTS = {"prior_alpha": 1.0, "prior_beta": 1.0}
+        _CONTINUOUS_DEFAULTS = {
+            "prior_mu": 0.0,
+            "prior_nu": 1e-4,
+            "prior_alpha_continuous": 1e-4,
+            "prior_beta_continuous": 1e-4,
+        }
+        if self.mode == "continuous":
+            ignored = [
+                name
+                for name, default in _DISCRETE_DEFAULTS.items()
+                if getattr(self, name) != default
+            ]
+            if ignored:
+                warnings.warn(
+                    f"mode='continuous' uses the NIG tracker; the following discrete "
+                    f"Beta-prior parameter(s) have no effect and will be ignored: "
+                    f"{ignored!r}. "
+                    f"Did you mean 'prior_alpha_continuous' / 'prior_beta_continuous'?",
+                    UserWarning,
+                    stacklevel=3,
+                )
+        elif self.mode == "discrete":
+            ignored = [
+                name
+                for name, default in _CONTINUOUS_DEFAULTS.items()
+                if getattr(self, name) != default
+            ]
+            if ignored:
+                warnings.warn(
+                    f"mode='discrete' uses the Beta-Binomial tracker; the following NIG "
+                    f"prior parameter(s) have no effect and will be ignored: "
+                    f"{ignored!r}. "
+                    f"Did you mean 'prior_alpha' / 'prior_beta'?",
+                    UserWarning,
+                    stacklevel=3,
+                )
 
     def fit(self, X: Any, y: Any) -> "BayesianBorutaSHAP":
         """Run the Bayesian Boruta SHAP loop on X and y.
@@ -362,8 +407,15 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         """Required by SelectorMixin to power transform() / inverse_transform()."""
         return self.get_support()
 
-    def summary(self) -> pd.DataFrame:
+    def summary(self, credible_mass: Optional[float] = None) -> pd.DataFrame:
         """Return a summary of the features and their decisions.
+
+        Parameters
+        ----------
+        credible_mass : float or None, optional
+            The probability mass to include in the credible interval
+            (must be in ``(0, 1)``).  When ``None`` (default), falls back to
+            the ``credible_mass`` value supplied at construction time.
 
         Column notes
         ------------
@@ -379,7 +431,8 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             for μ is symmetric, so the equal-tailed interval equals the HDI;
             the ``hdi_*`` label is therefore accurate here.
         """
-        lower, upper = self.tracker_.credible_interval(self.credible_mass)
+        mass = credible_mass if credible_mass is not None else self.credible_mass
+        lower, upper = self.tracker_.credible_interval(mass)
         
         data = []
         for i, name in enumerate(self.feature_names_):

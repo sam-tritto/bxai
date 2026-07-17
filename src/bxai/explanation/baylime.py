@@ -260,6 +260,10 @@ class BayLIME(BaseEstimator):
         for ``BaseEstimator.get_params`` / ``set_params`` / ``clone`` to work).
         Subsequent calls are no-ops, so repeated :meth:`explain_instance` calls
         incur no extra cost.
+
+        Only the summary statistics needed for perturbation (``means_`` and
+        ``stds_``) are stored; the full validated array is discarded immediately
+        after extraction to avoid retaining a potentially large copy in memory.
         """
         if hasattr(self, "_n_features"):
             return  # already set up
@@ -283,8 +287,9 @@ class BayLIME(BaseEstimator):
         else:
             self._feature_names = [f"feature_{i}" for i in range(self._n_features)]
 
-        # Feature scales — computed once and reused by every explain_instance call
-        self._training_data = training_data
+        # Compute and store only the summary statistics needed for perturbation.
+        # The validated array is *not* retained — storing it would keep an
+        # O(n_samples × n_features) copy alive for the lifetime of the object.
         self.means_ = np.mean(training_data, axis=0)
         self.stds_ = np.std(training_data, axis=0)
         self.stds_[self.stds_ == 0.0] = 1.0

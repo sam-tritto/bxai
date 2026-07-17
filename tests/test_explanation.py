@@ -121,14 +121,16 @@ def test_baylime_analytical_with_prior_mean():
 
 def test_baylime_analytical_bad_backend():
     training_data = make_data()
+    explainer = BayLIME(training_data=training_data, backend="invalid")
     with pytest.raises(ValueError, match="backend must be"):
-        BayLIME(training_data=training_data, backend="invalid")
+        explainer.explain_instance(np.zeros(4), linear_predict, label=0)
 
 
 def test_baylime_analytical_bad_mcmc_prior():
     training_data = make_data()
+    explainer = BayLIME(training_data=training_data, mcmc_prior="unsupported")
     with pytest.raises(ValueError, match="mcmc_prior must be"):
-        BayLIME(training_data=training_data, mcmc_prior="unsupported")
+        explainer.explain_instance(np.zeros(4), linear_predict, label=0)
 
 
 # ---------------------------------------------------------------------------
@@ -257,3 +259,68 @@ def test_baylime_mcmc_convergence_on_linear_truth():
     assert np.all(np.sign(exp_a.coef_mean) == np.sign(exp_m.coef_mean)), (
         f"Sign mismatch: analytical={exp_a.coef_mean}, mcmc={exp_m.coef_mean}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Memory / summary-statistics tests
+# ---------------------------------------------------------------------------
+
+def test_baylime_does_not_store_training_array_after_setup():
+    """_setup() must not retain the full training array — only means_ and stds_."""
+    training_data = make_data(n=200, p=5)
+    explainer = BayLIME(
+        training_data=training_data,
+        num_samples=50,
+        backend="analytical",
+        random_state=0,
+    )
+    instance = np.zeros(5)
+    explainer.explain_instance(instance, linear_predict, label=0)
+
+    assert not hasattr(explainer, "_training_data"), (
+        "_training_data must not be stored after _setup(); it holds the full "
+        "O(n_samples × n_features) copy and is unused after means_/stds_ are computed."
+    )
+
+
+def test_baylime_means_and_stds_match_training_data():
+    """means_ and stds_ stored by _setup() must equal the actual column statistics."""
+    rng = np.random.default_rng(7)
+    training_data = rng.standard_normal((150, 4))
+
+    explainer = BayLIME(
+        training_data=training_data,
+        num_samples=50,
+        backend="analytical",
+        random_state=7,
+    )
+    instance = np.zeros(4)
+    explainer.explain_instance(instance, linear_predict, label=0)
+
+    np.testing.assert_allclose(explainer.means_, training_data.mean(axis=0))
+    expected_stds = training_data.std(axis=0)
+    expected_stds[expected_stds == 0.0] = 1.0
+    np.testing.assert_allclose(explainer.stds_, expected_stds)
+
+
+def test_baylime_stds_zero_clamped():
+    """Constant-value columns must produce stds_ == 1.0 (not 0.0) to prevent division by zero."""
+    # Column 0 is constant; columns 1 and 2 vary
+    training_data = np.ones((50, 3))
+    training_data[:, 1] = np.linspace(-1, 1, 50)
+    training_data[:, 2] = np.linspace(0, 2, 50)
+
+    explainer = BayLIME(
+        training_data=training_data,
+        num_samples=50,
+        backend="analytical",
+        random_state=0,
+    )
+    instance = np.ones(3)
+    explainer.explain_instance(instance, linear_predict, label=0)
+
+    assert explainer.stds_[0] == 1.0, (
+        f"Constant column std must be clamped to 1.0; got {explainer.stds_[0]}"
+    )
+    assert explainer.stds_[1] > 0.0
+    assert explainer.stds_[2] > 0.0

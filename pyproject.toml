@@ -33,4 +33,35 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=7.0.0",
+    "pytest-xdist>=3.0.0",
+]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+
+# Run the entire tests/ package without specifying a path on the CLI.
+testpaths = ["tests"]
+
+# Default CLI flags applied on every run:
+#   -ra        — short summary of all non-passing outcomes
+#   --tb=short — compact tracebacks (full detail still shown on failure)
+#   --strict-markers — any undeclared @pytest.mark.X is an error, not a warning
+addopts = "-ra --tb=short --strict-markers"
+
+# Custom markers — declare here to avoid PytestUnknownMarkWarning.
+# Add new markers in the form: "name: description".
+markers = [
+    "slow: marks tests that are slow to run (deselect with -m 'not slow')",
+    "mcmc: marks tests that require PyMC / MCMC backend (skipped in minimal CI)",
+]
+
+# Suppress known noisy third-party warnings that are not actionable.
+filterwarnings = [
+    # shap internals — PendingDeprecationWarning about Colormap helpers
+    "ignore::PendingDeprecationWarning:shap",
+    # PyMC / ArviZ version-skew warnings — not a bxai concern
+    "ignore::FutureWarning:pymc",
+    "ignore::FutureWarning:arviz",
 ]

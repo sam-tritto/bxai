@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.types import FeatureStatus
 from bxai._utils.validation import check_consistent_length
-from bxai._utils.hdi import compute_hdi
+from bxai._utils.hdi import compute_hdi, HDI_LABEL
 
 
 
@@ -262,7 +262,8 @@ class ShrinkagePIP(BaseEstimator):
 
     def summary(self) -> pd.DataFrame:
         """Return a summary of feature coefficients, standard deviations, and PIPs."""
-        lower, upper, interval_type = compute_hdi(self.beta_flat_, 0.95)
+        lower, upper = compute_hdi(self.beta_flat_, 0.95)
+        interval_type = HDI_LABEL
 
         data = []
         for i, name in enumerate(self.feature_names_):

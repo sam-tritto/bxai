@@ -8,6 +8,9 @@ from bxai.selection.boruta_shap import BayesianBorutaSHAP
 from bxai.selection.permutation import BayesianPermutation
 from bxai._utils.types import FeatureStatus
 
+# Shared fixtures (tiny_Xy, small_Xy, large_Xy, small_rf, large_rf)
+# are provided by tests/conftest.py and injected automatically by pytest.
+
 
 # ===========================================================================
 # Shared helpers
@@ -34,10 +37,9 @@ class TestBayesianBorutaSHAPDiscrete:
     # Smoke / structure
     # -----------------------------------------------------------------------
 
-    def test_attributes_exist_after_fit(self):
+    def test_attributes_exist_after_fit(self, small_Xy):
         """Fit must populate confirmed_, rejected_, tentative_, support_."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42)
         selector.fit(X, y)
 
@@ -46,10 +48,9 @@ class TestBayesianBorutaSHAPDiscrete:
         assert hasattr(selector, "tentative_")
         assert isinstance(selector.confirmed_, list)
 
-    def test_summary_structure(self):
+    def test_summary_structure(self, small_Xy):
         """summary() must return a DataFrame with the expected columns and shape."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42)
         selector.fit(X, y)
 
@@ -58,17 +59,16 @@ class TestBayesianBorutaSHAPDiscrete:
         assert len(df) == 6
         assert "status" in df.columns
         assert "mean" in df.columns
-        assert "hdi_lower" in df.columns
-        assert "hdi_upper" in df.columns
+        assert "ci_lower" in df.columns
+        assert "ci_upper" in df.columns
 
     # -----------------------------------------------------------------------
     # credible_mass override
     # -----------------------------------------------------------------------
 
-    def test_summary_credible_mass_override_produces_narrower_interval(self):
+    def test_summary_credible_mass_override_produces_narrower_interval(self, small_Xy):
         """Passing a smaller credible_mass to summary() must yield narrower intervals."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=5, random_state=42)
         selector.fit(X, y)
 
@@ -81,10 +81,9 @@ class TestBayesianBorutaSHAPDiscrete:
             "A smaller credible_mass must yield strictly narrower credible intervals."
         )
 
-    def test_summary_default_equals_constructor_credible_mass(self):
+    def test_summary_default_equals_constructor_credible_mass(self, small_Xy):
         """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=5,
                                        credible_mass=0.90, random_state=42)
         selector.fit(X, y)
@@ -98,23 +97,21 @@ class TestBayesianBorutaSHAPDiscrete:
     # Credible-interval ordering
     # -----------------------------------------------------------------------
 
-    def test_hdi_lower_less_than_upper(self):
+    def test_hdi_lower_less_than_upper(self, small_Xy):
         """summary() must satisfy hdi_lower < hdi_upper for every feature."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=5, random_state=42)
         selector.fit(X, y)
 
         df = selector.summary()
-        assert (df["hdi_lower"] < df["hdi_upper"]).all(), (
-            "hdi_lower must be strictly less than hdi_upper for all features.\n"
-            f"Got:\n{df[['feature', 'hdi_lower', 'hdi_upper']]}"
+        assert (df["ci_lower"] < df["ci_upper"]).all(), (
+            "ci_lower must be strictly less than ci_upper for all features.\n"
+            f"Got:\n{df[['feature', 'ci_lower', 'ci_upper']]}"
         )
 
-    def test_posterior_mean_in_unit_interval(self):
+    def test_posterior_mean_in_unit_interval(self, small_Xy):
         """Discrete-mode posterior means are Beta distribution means: must lie in (0, 1)."""
-        X, y = make_classification(n_samples=60, n_features=6, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=5, random_state=42)
         selector.fit(X, y)
 
@@ -167,10 +164,9 @@ class TestBayesianBorutaSHAPDiscrete:
             f"Summary:\n{df[['feature', 'mean', 'status']]}"
         )
 
-    def test_posterior_updates_accumulate(self):
+    def test_posterior_updates_accumulate(self, small_Xy):
         """Running more iterations must raise posterior evidence (alpha + beta grows)."""
-        X, y = make_classification(n_samples=100, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
 
         sel_few = BayesianBorutaSHAP(mode="discrete", max_iter=2, random_state=42)
         sel_few.fit(X, y)
@@ -196,10 +192,9 @@ class TestBayesianBorutaSHAPContinuous:
     # Smoke / structure
     # -----------------------------------------------------------------------
 
-    def test_summary_has_mu_column(self):
+    def test_summary_has_mu_column(self, small_Xy):
         """Continuous-mode summary must contain a 'mu' column."""
-        X, y = make_classification(n_samples=50, n_features=5, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="continuous", max_iter=3, random_state=42)
         selector.fit(X, y)
 
@@ -210,10 +205,9 @@ class TestBayesianBorutaSHAPContinuous:
     # Credible-interval ordering
     # -----------------------------------------------------------------------
 
-    def test_hdi_lower_less_than_upper(self):
+    def test_hdi_lower_less_than_upper(self, small_Xy):
         """hdi_lower < hdi_upper must hold for every feature in continuous mode."""
-        X, y = make_classification(n_samples=100, n_features=5, n_informative=2,
-                                    n_redundant=0, random_state=42)
+        X, y = small_Xy
         selector = BayesianBorutaSHAP(mode="continuous", max_iter=5, random_state=42)
         selector.fit(X, y)
 
@@ -307,48 +301,36 @@ class TestBayesianPermutation:
     # Smoke / structure
     # -----------------------------------------------------------------------
 
-    def test_attributes_exist_after_fit(self):
+    def test_attributes_exist_after_fit(self, small_Xy, small_rf):
         """Fit must populate confirmed_, rejected_, tentative_."""
-        X, y = make_classification(n_samples=50, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
-        model = RandomForestClassifier(n_estimators=5, random_state=42)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=5, random_state=42)
         selector.fit(X, y)
 
         assert hasattr(selector, "confirmed_")
         assert hasattr(selector, "rejected_")
 
-    def test_summary_structure(self):
-        """summary() must return a 4-row DataFrame with the expected columns."""
-        X, y = make_classification(n_samples=50, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
-        model = RandomForestClassifier(n_estimators=5, random_state=42)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+    def test_summary_structure(self, small_Xy, small_rf):
+        """summary() must return a 6-row DataFrame with the expected columns."""
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=5, random_state=42)
         selector.fit(X, y)
 
         df = selector.summary()
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == 4
+        assert len(df) == 6
         assert "hdi_lower" in df.columns
 
     # -----------------------------------------------------------------------
     # credible_mass override
     # -----------------------------------------------------------------------
 
-    def test_summary_credible_mass_override_produces_narrower_interval(self):
+    def test_summary_credible_mass_override_produces_narrower_interval(self, small_Xy, small_rf):
         """Passing a smaller credible_mass to summary() must yield narrower intervals."""
-        X, y = make_classification(n_samples=100, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
-        model = RandomForestClassifier(n_estimators=10, random_state=42)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=10, random_state=42)
         selector.fit(X, y)
 
@@ -361,14 +343,10 @@ class TestBayesianPermutation:
             "A smaller credible_mass must yield strictly narrower credible intervals."
         )
 
-    def test_summary_default_equals_constructor_credible_mass(self):
+    def test_summary_default_equals_constructor_credible_mass(self, small_Xy, small_rf):
         """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
-        X, y = make_classification(n_samples=50, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
-        model = RandomForestClassifier(n_estimators=5, random_state=42)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=5, credible_mass=0.90, random_state=42)
         selector.fit(X, y)
 
@@ -377,14 +355,10 @@ class TestBayesianPermutation:
 
         pd.testing.assert_frame_equal(df_default, df_explicit)
 
-    def test_hdi_lower_less_than_upper(self):
+    def test_hdi_lower_less_than_upper(self, small_Xy, small_rf):
         """hdi_lower < hdi_upper must hold for every feature."""
-        X, y = make_classification(n_samples=100, n_features=4, n_informative=2,
-                                    n_redundant=0, random_state=42)
-        model = RandomForestClassifier(n_estimators=10, random_state=42)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=10, random_state=42)
         selector.fit(X, y)
 
@@ -398,27 +372,16 @@ class TestBayesianPermutation:
     # Posterior update direction
     # -----------------------------------------------------------------------
 
-    def test_confirmed_features_rank_higher_than_rejected(self):
+    def test_confirmed_features_rank_higher_than_rejected(self, large_Xy, large_rf):
         """CONFIRMED features must have a higher posterior mean score-drop than REJECTED ones.
 
         The selector's own decisions are the ground truth: by construction, a feature is
         CONFIRMED only when its CI lies entirely above zero, so CONFIRMED mean > REJECTED
         mean must always hold when both groups exist.
         """
-        X, y = make_classification(
-            n_samples=300,
-            n_features=8,
-            n_informative=2,
-            n_redundant=0,
-            n_repeated=0,
-            n_clusters_per_class=1,
-            random_state=0,
-        )
-        model = RandomForestClassifier(n_estimators=50, random_state=0)
-        model.fit(X, y)
-
+        X, y = large_Xy
         selector = BayesianPermutation(
-            model=model,
+            model=large_rf,
             scoring="accuracy",
             n_repeats=20,
             random_state=0,
@@ -441,27 +404,14 @@ class TestBayesianPermutation:
             f"Summary:\n{df[['feature', 'mean', 'status']]}"
         )
 
-    def test_confirmed_features_have_positive_posterior_mean(self):
+    def test_confirmed_features_have_positive_posterior_mean(self, large_Xy, large_rf):
         """Any CONFIRMED feature must have a positive posterior mean (score drop > 0)."""
-        n_features = 6
-        n_informative = 2
-        X, y = make_classification(
-            n_samples=300,
-            n_features=n_features,
-            n_informative=n_informative,
-            n_redundant=0,
-            n_repeated=0,
-            n_clusters_per_class=1,
-            random_state=1,
-        )
-        model = RandomForestClassifier(n_estimators=50, random_state=1)
-        model.fit(X, y)
-
+        X, y = large_Xy
         selector = BayesianPermutation(
-            model=model,
+            model=large_rf,
             scoring="accuracy",
             n_repeats=20,
-            random_state=1,
+            random_state=0,
         )
         selector.fit(X, y)
 
@@ -474,19 +424,14 @@ class TestBayesianPermutation:
                 f"Got:\n{confirmed[['feature', 'mean']]}"
             )
 
-    def test_posterior_mean_direction_matches_score_drop_sign(self):
+    def test_posterior_mean_direction_matches_score_drop_sign(self, small_Xy, small_rf):
         """The sign of the posterior mean must reflect the actual mean score drop.
 
         For a good model and n_repeats that is large enough, posterior mu
         should converge close to the sample mean of the score drops.
         """
-        n_features = 4
-        X, y = make_classification(n_samples=200, n_features=n_features,
-                                    n_informative=2, n_redundant=0, random_state=5)
-        model = RandomForestClassifier(n_estimators=30, random_state=5)
-        model.fit(X, y)
-
-        selector = BayesianPermutation(model=model, scoring="accuracy",
+        X, y = small_Xy
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
                                         n_repeats=15, random_state=5)
         selector.fit(X, y)
 

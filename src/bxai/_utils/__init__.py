@@ -4,7 +4,7 @@ from bxai._utils.validation import (
     check_consistent_length,
     check_is_fitted,
 )
-from bxai._utils.hdi import compute_hdi
+from bxai._utils.hdi import compute_hdi, HDI_LABEL
 
 __all__ = [
     "FeatureStatus",
@@ -12,4 +12,5 @@ __all__ = [
     "check_consistent_length",
     "check_is_fitted",
     "compute_hdi",
+    "HDI_LABEL",
 ]

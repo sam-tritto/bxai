@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator
 from typing import Optional, List, Dict, Tuple, Union, Any
 
 from bxai._utils.validation import check_consistent_length
-from bxai._utils.hdi import compute_hdi
+from bxai._utils.hdi import compute_hdi, HDI_LABEL
 
 
 
@@ -197,9 +197,10 @@ class BARTImportance(BaseEstimator):
         # Compute the true Highest Density Interval (HDI) per feature.
         # VIF distributions are right-skewed, so the equal-tailed percentile
         # interval and the HDI can differ meaningfully.
-        self.hdi_lower_, self.hdi_upper_, self._interval_label = compute_hdi(
+        self.hdi_lower_, self.hdi_upper_ = compute_hdi(
             self.vif_distribution_, self.credible_mass
         )
+        self._interval_label = HDI_LABEL
 
         # Select features whose lower HDI exceeds baseline random-chance frequency
         self.support_ = self.hdi_lower_ > self.baseline_threshold_

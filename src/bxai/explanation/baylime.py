@@ -62,7 +62,7 @@ class BayLIMEExplanation:
         mass = credible_mass if credible_mass is not None else self.credible_mass
 
         if self.backend == "mcmc" and self.posterior_draws_ is not None:
-            lower, upper, _ = compute_hdi(self.posterior_draws_, mass)
+            lower, upper = compute_hdi(self.posterior_draws_, mass)
         else:
             q_lower = (1.0 - mass) / 2.0
             q_upper = 1.0 - q_lower
@@ -487,7 +487,7 @@ class BayLIME(BaseEstimator):
         intercept_var = float(intercept_draws.var())
 
         # Pre-compute HDI at the requested credible mass
-        hdi_lower, hdi_upper, _ = compute_hdi(coef_flat, credible_mass=0.95)
+        hdi_lower, hdi_upper = compute_hdi(coef_flat, credible_mass=0.95)
 
         return BayLIMEExplanation(
             feature_names=self._feature_names,

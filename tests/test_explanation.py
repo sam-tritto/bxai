@@ -3,6 +3,10 @@ import pandas as pd
 import pytest
 from bxai.explanation.baylime import BayLIME, BayLIMEExplanation
 
+# Convenience alias — apply to every test that invokes PyMC sampling.
+_mcmc = pytest.mark.mcmc
+_slow = pytest.mark.slow
+
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -137,6 +141,8 @@ def test_baylime_analytical_bad_mcmc_prior():
 # MCMC backend tests
 # ---------------------------------------------------------------------------
 
+@_slow
+@_mcmc
 def test_baylime_mcmc_normal_prior():
     training_data = make_data(n=50, p=3, seed=0)
     explainer = BayLIME(
@@ -162,6 +168,8 @@ def test_baylime_mcmc_normal_prior():
     assert len(explanation.coef_mean) == 3
 
 
+@_slow
+@_mcmc
 def test_baylime_mcmc_horseshoe_prior():
     training_data = make_data(n=50, p=3, seed=1)
     explainer = BayLIME(
@@ -182,6 +190,8 @@ def test_baylime_mcmc_horseshoe_prior():
     assert explanation.posterior_draws_ is not None
 
 
+@_slow
+@_mcmc
 def test_baylime_mcmc_credible_intervals():
     training_data = make_data(n=50, p=3, seed=2)
     explainer = BayLIME(
@@ -204,6 +214,8 @@ def test_baylime_mcmc_credible_intervals():
     assert all(lo < hi for lo, hi in ci.values())
 
 
+@_slow
+@_mcmc
 def test_baylime_mcmc_as_dataframe():
     training_data = make_data(n=50, p=3, seed=3)
     explainer = BayLIME(
@@ -227,6 +239,8 @@ def test_baylime_mcmc_as_dataframe():
     assert (df["hdi_lower"] < df["hdi_upper"]).all()
 
 
+@_slow
+@_mcmc
 def test_baylime_mcmc_convergence_on_linear_truth():
     """MCMC posterior means should broadly agree with analytical means on a linear function."""
     np.random.seed(99)

@@ -355,6 +355,19 @@ class TestBayesianPermutation:
         assert hasattr(selector, "feature_importances_")
         assert len(selector.feature_importances_) == X.shape[1]
 
+    def test_bayesian_permutation_parallel(self, small_Xy, small_rf):
+        """Fit with n_jobs=2 must produce identical results to sequential fit."""
+        X, y = small_Xy
+        sel_seq = BayesianPermutation(model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=1, random_state=42)
+        sel_seq.fit(X, y)
+
+        sel_par = BayesianPermutation(model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=2, random_state=42)
+        sel_par.fit(X, y)
+
+        np.testing.assert_allclose(sel_seq.feature_importances_, sel_par.feature_importances_)
+        assert sel_seq.confirmed_ == sel_par.confirmed_
+        assert sel_seq.rejected_ == sel_par.rejected_
+
     def test_summary_structure(self, small_Xy, small_rf):
         """summary() must return a 6-row DataFrame with the expected columns."""
         X, y = small_Xy

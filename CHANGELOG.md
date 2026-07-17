@@ -91,6 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the active prior.
 
 ### Added
+- **Cross-validation stability helper** — Added `cross_val_feature_stability` to evaluate selector robustness, computing chance-adjusted Nogueira and Jaccard stability indices in parallel using `joblib`.
+- **`feature_importances_` attribute** — Implemented standard `feature_importances_` attribute across all selectors (`BayesianBorutaSHAP`, `BayesianPermutation`, `ShrinkagePIP`, `BARTImportance`) for direct integration with SHAP plotting utilities.
+- **Pipeline integration support** — Added `SelectorMixin` inheritance and support masks to `ShrinkagePIP` and `BARTImportance` so all selectors can be fitted and transformed inside standard scikit-learn `Pipeline` objects.
+- **Iteration history tracking** — Added an `iteration_history_` attribute to `BayesianBorutaSHAP` recording iteration-by-iteration status changes and posterior updates for convergence diagnostics.
+- **Classification support (Probit BART) in `BARTImportance`** — Added binary classification support to `BARTImportance` via a Probit link function and Bernoulli likelihood, including automatic target label binarization.
+- **Interpretable perturbation space in `BayLIME`** — Added a `perturbation_space` parameter (supporting `"feature_space"` and `"interpretable"`) enabling binary on/off perturbations and binary distance computation as in original LIME.
+- **`n_jobs` parallel feature evaluation in `BayesianPermutation`** — Added `n_jobs` parameter to `BayesianPermutation` to run column permutation score evaluations in parallel via `joblib`.
+- **Dependency optimizations** — Made `shap` and `lightgbm` optional dependencies under a new `boruta` extra. Removed phantom dependencies `numba` and `llvmlite` to reduce disk footprint by ~250MB. Updated pandas floor to `pandas>=2.0.0`. Switched build backend to standard `hatchling`.
 - `ShrinkagePIP` exposes `kappa_mean_` (mean posterior shrinkage factor per
   feature) after fitting when `pip_method='kappa'`, and `epsilon_` (the
   effective threshold used) when `pip_method='threshold'`.

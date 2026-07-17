@@ -4,11 +4,27 @@ from sklearn.base import BaseEstimator
 from sklearn.feature_selection import SelectorMixin
 from sklearn.metrics import get_scorer
 from typing import Optional, Union, Callable, Any
+from joblib import Parallel, delayed
 
 from bxai._utils.types import FeatureStatus
 from sklearn.utils.validation import check_is_fitted
 from bxai._utils.validation import check_consistent_length
 from bxai._engines.normal_ig import NormalIGTracker
+
+
+def _evaluate_shuffled_score(
+    model: Any,
+    scorer: Any,
+    X_arr: np.ndarray,
+    y_arr: np.ndarray,
+    col_idx: int,
+    seed: int,
+) -> float:
+    """Evaluate permutation score of a single feature in a single trial."""
+    rng = np.random.default_rng(seed)
+    X_temp = X_arr.copy()
+    X_temp[:, col_idx] = rng.permutation(X_temp[:, col_idx])
+    return float(scorer(model, X_temp, y_arr))
 
 
 class BayesianPermutation(SelectorMixin, BaseEstimator):
@@ -59,6 +75,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         prior_nu: float = 1e-4,
         prior_alpha: float = 1e-4,
         prior_beta: float = 1e-4,
+        n_jobs: int = 1,
         random_state: Optional[int] = None,
     ):
         """
@@ -108,6 +125,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         self.prior_nu = prior_nu
         self.prior_alpha = prior_alpha
         self.prior_beta = prior_beta
+        self.n_jobs = n_jobs
         self.random_state = random_state
 
     # ------------------------------------------------------------------
@@ -208,26 +226,29 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         # view (e.g. a column-sliced DataFrame or Fortran-order array) — plain
         # .copy() with order='K' would preserve the non-contiguous layout and
         # could share memory with the original under certain NumPy versions.
+        # Re-compute baseline each repeat so stochastic scorers contribute
+        # a fresh noise draw that is matched to the shuffled-score draws
+        # within the same repeat, keeping deltas mean-zero under H0.
+        baselines = [scorer(self.model, X_arr, y_arr) for _ in range(self.n_repeats)]
+
+        # Prepare tasks for flat parallel evaluation
+        tasks = []
         for r in range(self.n_repeats):
-            # Re-compute baseline each repeat so stochastic scorers contribute
-            # a fresh noise draw that is matched to the shuffled-score draws
-            # within the same repeat, keeping deltas mean-zero under H0.
-            baseline_score = scorer(self.model, X_arr, y_arr)
-
-            X_temp = np.ascontiguousarray(X_arr)
             for col_idx in range(n_features):
-                # Shuffle column
-                original_col = X_temp[:, col_idx].copy()
-                X_temp[:, col_idx] = rng.permutation(original_col)
+                seed = int(rng.integers(0, 2**31 - 1))
+                tasks.append((r, col_idx, seed))
 
-                # Compute shuffled score
-                shuffled_score = scorer(self.model, X_temp, y_arr)
+        # Run all shuffled score evaluations in parallel
+        results = Parallel(n_jobs=self.n_jobs)(
+            delayed(_evaluate_shuffled_score)(
+                self.model, scorer, X_arr, y_arr, col_idx, seed
+            )
+            for _, col_idx, seed in tasks
+        )
 
-                # Drop in score is baseline - shuffled (higher positive means more important)
-                deltas[r, col_idx] = baseline_score - shuffled_score
-
-                # Restore column before evaluating the next feature
-                X_temp[:, col_idx] = original_col
+        # Drop in score is baseline - shuffled (higher positive means more important)
+        for idx, (r, col_idx, _) in enumerate(tasks):
+            deltas[r, col_idx] = baselines[r] - results[idx]
 
         # Feed all repeats to the tracker in a single batch.
         #

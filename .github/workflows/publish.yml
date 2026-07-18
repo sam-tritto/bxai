@@ -30,6 +30,8 @@ jobs:
 
       - name: Publish package
         run: uv publish
-        env:
-          # Fallback token for initial package creation or token-based publishing
-          UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}
+        # Note: Trusted Publishing is highly recommended and does not require credentials.
+        # However, if you prefer token-based publishing (e.g. via PyPI API token), 
+        # uncomment the following environment variable declaration:
+        # env:
+        #   UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}

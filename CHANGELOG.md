@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-07-18
+
+### Fixed
+- **`EOFError` in PyMC multiprocessing on macOS inside Jupyter Notebooks**: Added `mcmc_cores` parameter to `BayLIME` (defaulting to `1` to run sampling sequentially) and `cores` parameter to `BARTImportance` and `ShrinkagePIP` (defaulting to `None` to use PyMC default but allowing users to set `cores=1` or other positive values). This prevents Python process serialization and socket connection crashes when spawning chain processes in interactive environments like Jupyter notebooks on macOS.
+
 ## [0.1.1] - 2026-07-17
 
 ### Fixed

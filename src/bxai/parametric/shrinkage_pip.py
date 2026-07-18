@@ -65,6 +65,8 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         Number of tuning steps per chain.
     chains : int, default 2
         Number of MCMC chains.
+    cores : int or None, default None
+        Number of CPU cores to use for sampling.
     progressbar : bool, default False
         Whether to display a PyMC progress bar during sampling.
     random_state : int or None, default None
@@ -82,6 +84,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         n_samples: int = 1000,
         tune: int = 1000,
         chains: int = 2,
+        cores: int | None = None,
         progressbar: bool = False,
         random_state: int | None = None,
     ):
@@ -94,6 +97,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         self.n_samples = n_samples
         self.tune = tune
         self.chains = chains
+        self.cores = cores
         self.progressbar = progressbar
         self.random_state = random_state
 
@@ -113,6 +117,9 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 f"pip_threshold must be in (0, 1) because PIP is a probability; "
                 f"got {self.pip_threshold!r}"
             )
+        if self.cores is not None:
+            if not isinstance(self.cores, int) or self.cores <= 0:
+                raise ValueError(f"cores must be a positive integer or None; got {self.cores!r}")
 
     def _resolve_pip_method(self) -> str:
         """Return the effective PIP method given ``prior`` and ``pip_method``."""
@@ -207,6 +214,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 draws=self.n_samples,
                 tune=self.tune,
                 chains=self.chains,
+                cores=self.cores,
                 random_seed=self.random_state,
                 progressbar=self.progressbar,
                 return_inferencedata=True,

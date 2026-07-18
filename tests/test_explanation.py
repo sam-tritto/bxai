@@ -149,6 +149,17 @@ def test_baylime_analytical_bad_mcmc_prior():
         explainer.explain_instance(np.zeros(4), linear_predict, label=0)
 
 
+def test_baylime_bad_mcmc_cores():
+    training_data = make_data()
+    explainer = BayLIME(training_data=training_data, mcmc_cores=0)
+    with pytest.raises(ValueError, match="mcmc_cores must be"):
+        explainer.explain_instance(np.zeros(4), linear_predict, label=0)
+
+    explainer = BayLIME(training_data=training_data, mcmc_cores="invalid")
+    with pytest.raises(ValueError, match="mcmc_cores must be"):
+        explainer.explain_instance(np.zeros(4), linear_predict, label=0)
+
+
 # ---------------------------------------------------------------------------
 # MCMC backend tests
 # ---------------------------------------------------------------------------

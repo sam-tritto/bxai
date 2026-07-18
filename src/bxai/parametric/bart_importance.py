@@ -90,6 +90,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         n_samples: int = 1000,
         tune: int = 1000,
         chains: int = 2,
+        cores: int | None = None,
         credible_mass: float = 0.95,
         baseline_frequency: float | None = None,
         progressbar: bool = False,
@@ -100,6 +101,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         self.n_samples = n_samples
         self.tune = tune
         self.chains = chains
+        self.cores = cores
         self.credible_mass = credible_mass
         self.baseline_frequency = baseline_frequency
         self.progressbar = progressbar
@@ -119,6 +121,9 @@ class BARTImportance(SelectorMixin, BaseEstimator):
             raise ValueError(
                 f"credible_mass must be in (0, 1); got {self.credible_mass!r}"
             )
+        if self.cores is not None:
+            if not isinstance(self.cores, int) or self.cores <= 0:
+                raise ValueError(f"cores must be a positive integer or None; got {self.cores!r}")
 
     def fit(self, X: Any, y: Any) -> "BARTImportance":
         """Fit the BART model using PyMC.
@@ -188,6 +193,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
                 draws=self.n_samples,
                 tune=self.tune,
                 chains=self.chains,
+                cores=self.cores,
                 random_seed=self.random_state,
                 progressbar=self.progressbar,
                 return_inferencedata=True,

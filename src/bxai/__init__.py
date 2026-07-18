@@ -8,7 +8,7 @@ from bxai.selection import (
     cross_val_feature_stability,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 __all__ = [
     "BayesianBorutaSHAP",

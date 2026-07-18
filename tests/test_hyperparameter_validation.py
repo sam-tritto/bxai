@@ -489,6 +489,16 @@ class TestShrinkagePIPValidation:
         with pytest.raises(ValueError, match="pip_threshold must be in"):
             selector.fit(X, y)
 
+    def test_cores_invalid_raises(self):
+        X, y = self._make_data()
+        selector = ShrinkagePIP(cores=0)
+        with pytest.raises(ValueError, match="cores must be"):
+            selector.fit(X, y)
+
+        selector = ShrinkagePIP(cores="invalid")
+        with pytest.raises(ValueError, match="cores must be"):
+            selector.fit(X, y)
+
 
 # ---------------------------------------------------------------------------
 # BARTImportance — estimator-level guards
@@ -527,4 +537,14 @@ class TestBARTImportanceValidation:
         X, y = self._make_data()
         selector = BARTImportance(model_type="classification")
         with pytest.raises(ValueError, match="requires a binary target"):
+            selector.fit(X, y)
+
+    def test_cores_invalid_raises(self):
+        X, y = self._make_data()
+        selector = BARTImportance(cores=0)
+        with pytest.raises(ValueError, match="cores must be"):
+            selector.fit(X, y)
+
+        selector = BARTImportance(cores="invalid")
+        with pytest.raises(ValueError, match="cores must be"):
             selector.fit(X, y)

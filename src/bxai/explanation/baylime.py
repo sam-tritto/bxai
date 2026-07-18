@@ -221,6 +221,8 @@ class BayLIME(BaseEstimator):
         Number of MCMC tuning steps (MCMC backend only).
     mcmc_chains : int, default=2
         Number of MCMC chains (MCMC backend only).
+    mcmc_cores : int, default=1
+        Number of CPU cores to use for MCMC chains (MCMC backend only).
     progressbar : bool, default=False
         Whether to show the PyMC sampling progress bar (MCMC backend only).
     random_state : int, optional
@@ -240,6 +242,7 @@ class BayLIME(BaseEstimator):
         mcmc_samples: int = 1000,
         mcmc_tune: int = 500,
         mcmc_chains: int = 2,
+        mcmc_cores: int | None = 1,
         progressbar: bool = False,
         perturbation_space: str = "feature_space",
         random_state: int | None = None,
@@ -261,6 +264,7 @@ class BayLIME(BaseEstimator):
         self.mcmc_samples = mcmc_samples
         self.mcmc_tune = mcmc_tune
         self.mcmc_chains = mcmc_chains
+        self.mcmc_cores = mcmc_cores
         self.progressbar = progressbar
         self.perturbation_space = perturbation_space
         self.random_state = random_state
@@ -289,6 +293,11 @@ class BayLIME(BaseEstimator):
             raise ValueError("backend must be 'analytical' or 'mcmc'")
         if self.mcmc_prior not in ("normal", "horseshoe"):
             raise ValueError("mcmc_prior must be 'normal' or 'horseshoe'")
+        if self.mcmc_cores is not None:
+            if not isinstance(self.mcmc_cores, int) or self.mcmc_cores <= 0:
+                raise ValueError(
+                    f"mcmc_cores must be a positive integer or None; got {self.mcmc_cores!r}"
+                )
         if self.perturbation_space not in ("feature_space", "interpretable"):
             raise ValueError(
                 f"perturbation_space must be 'feature_space' or 'interpretable'; got {self.perturbation_space!r}"
@@ -527,6 +536,7 @@ class BayLIME(BaseEstimator):
                 draws=self.mcmc_samples,
                 tune=self.mcmc_tune,
                 chains=self.mcmc_chains,
+                cores=self.mcmc_cores,
                 random_seed=self.random_state,
                 progressbar=self.progressbar,
                 return_inferencedata=True,

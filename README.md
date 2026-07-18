@@ -38,18 +38,23 @@ uv add bxai --optional boruta --optional mcmc --optional xgboost --optional catb
 
 ## Quick Start
 
+We will load the real-world **Breast Cancer Wisconsin (Diagnostic)** dataset as our dataset of choice:
+
+```python
+from sklearn.datasets import load_breast_cancer
+
+data = load_breast_cancer(as_frame=True)
+X, y = data.data, data.target
+```
+
 ### BayesianBorutaSHAP
 
 ```python
 import lightgbm as lgb
-from sklearn.datasets import make_classification
 from bxai.selection import BayesianBorutaSHAP
 
-# Generate synthetic dataset
-X, y = make_classification(n_samples=500, n_features=20, n_informative=5, random_state=42)
-
 # Fit Bayesian BorutaSHAP
-clf = lgb.LGBMClassifier(random_state=42)
+clf = lgb.LGBMClassifier(random_state=42, verbose=-1)
 selector = BayesianBorutaSHAP(model=clf, mode="discrete", max_iter=20, random_state=42)
 selector.fit(X, y)
 
@@ -61,12 +66,8 @@ print("Confirmed Features:", selector.confirmed_)
 ```python
 from bxai.selection import BayesianPermutation
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.datasets import make_classification
 
-# Generate synthetic dataset
-X_perm, y_perm = make_classification(n_samples=200, n_features=10, n_informative=3, random_state=42)
-
-clf_perm = RandomForestClassifier(random_state=42).fit(X_perm, y_perm)
+clf_perm = RandomForestClassifier(random_state=42).fit(X, y)
 
 # Permutation feature selection with parallel jobs (n_jobs=2)
 selector_perm = BayesianPermutation(
@@ -76,27 +77,29 @@ selector_perm = BayesianPermutation(
     n_jobs=2,
     random_state=42
 )
-selector_perm.fit(X_perm, y_perm)
+selector_perm.fit(X, y)
 
 print("Confirmed Features:", selector_perm.confirmed_)
-print(selector_perm.summary()[["feature", "mean", "hdi_lower", "hdi_upper", "selected"]])
+print(selector_perm.summary()[["feature", "mean", "hdi_lower", "hdi_upper", "status"]])
 ```
 
 ### BayLIME
 
 ```python
 from bxai.explanation import BayLIME
-import numpy as np
 
-# Instantiate BayLIME
+# Instantiate BayLIME with pandas DataFrame column names
 explainer = BayLIME(
     training_data=X,
-    feature_names=[f"feat_{i}" for i in range(20)]
+    feature_names=list(X.columns)
 )
 
-# Explain a single instance
+# Fit the base model before explaining
+clf.fit(X, y)
+
+# Explain the first patient's instance
 explanation = explainer.explain_instance(
-    instance=X[0],
+    instance=X.iloc[0].values,
     predict_fn=clf.predict_proba
 )
 
@@ -107,26 +110,26 @@ print(explanation.as_dataframe())
 
 ```python
 from bxai.parametric import ShrinkagePIP
-from sklearn.datasets import make_regression
-
-X, y = make_regression(n_samples=200, n_features=30, n_informative=5, random_state=42)
 
 # Horseshoe prior — uses kappa-based PIP by default (pip_method='auto')
 # PIP = P(κ_j < 0.5 | data), where κ_j = 1/(1 + λ_j² τ²)
-selector = ShrinkagePIP(
+# For binary target, model_type='logistic' must be specified
+selector_hs = ShrinkagePIP(
+    model_type="logistic",
     prior="horseshoe",
     kappa_threshold=0.5,   # κ < 0.5 → local scale dominates → signal
     pip_threshold=0.80,
     n_samples=500,
     random_state=42,
 )
-selector.fit(X, y)
+selector_hs.fit(X, y)
 
-print("Selected features:", selector.confirmed_)
-print(selector.summary()[["feature", "pip", "kappa_mean", "selected"]])
+print("Selected features (Horseshoe):", selector_hs.confirmed_)
+print(selector_hs.summary()[["feature", "pip", "kappa_mean", "selected"]])
 
-# Lasso prior — uses auto-scaled |β| threshold (epsilon = std(y)/10)
+# Lasso prior — uses auto-scaled |β| threshold (epsilon = 0.1 on log-odds scale)
 selector_lasso = ShrinkagePIP(
+    model_type="logistic",
     prior="lasso",
     pip_threshold=0.80,
     n_samples=500,
@@ -134,24 +137,17 @@ selector_lasso = ShrinkagePIP(
 )
 selector_lasso.fit(X, y)
 print(f"Effective epsilon: {selector_lasso.epsilon_:.4f}")
+print("Selected features (Lasso):", selector_lasso.confirmed_)
 ```
 
 ### BARTImportance
 
 ```python
 from bxai.parametric import BARTImportance
-from sklearn.datasets import make_regression, make_classification
-
-# Regression example
-X_reg, y_reg = make_regression(n_samples=100, n_features=10, n_informative=3, random_state=42)
-bart_reg = BARTImportance(model_type="regression", n_trees=20, n_samples=200, tune=100, chains=1, random_state=42)
-bart_reg.fit(X_reg, y_reg)
-print("Regression Selected features:", bart_reg.confirmed_)
 
 # Classification example (Probit BART)
-X_clf, y_clf = make_classification(n_samples=100, n_features=10, n_informative=3, random_state=42)
 bart_clf = BARTImportance(model_type="classification", n_trees=20, n_samples=200, tune=100, chains=1, random_state=42)
-bart_clf.fit(X_clf, y_clf)
+bart_clf.fit(X, y)
 print("Classification Selected features:", bart_clf.confirmed_)
 ```
 

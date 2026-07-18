@@ -7,12 +7,38 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = [
+    "bayesian",
+    "feature-selection",
+    "explainable-ai",
+    "lime",
+    "boruta",
+    "shap",
+    "horseshoe-prior",
+]
 dependencies = [
     "numpy>=1.22.0",
     "scipy>=1.8.0",
     "pandas>=2.0.0",
     "scikit-learn>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/sam-tritto/bxai"
+Repository = "https://github.com/sam-tritto/bxai"
+Documentation = "https://github.com/sam-tritto/bxai#readme"
 
 [project.optional-dependencies]
 xgboost = ["xgboost>=1.6.0"]
@@ -34,6 +60,8 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=7.0.0",
     "pytest-xdist>=3.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 
 # ---------------------------------------------------------------------------
@@ -65,3 +93,55 @@ filterwarnings = [
     "ignore::FutureWarning:pymc",
     "ignore::FutureWarning:arviz",
 ]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+    "B904", # raise from None for clean error chaining
+]
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "numpy.*",
+    "scipy.*",
+    "pandas.*",
+    "sklearn.*",
+    "shap.*",
+    "lightgbm.*",
+    "xgboost.*",
+    "catboost.*",
+    "pymc.*",
+    "pymc_bart.*",
+    "arviz.*",
+    "joblib.*",
+    "matplotlib.*",
+    "pytensor.*",
+]
+ignore_missing_imports = true
+

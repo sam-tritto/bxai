@@ -1,14 +1,13 @@
 import numpy as np
 import pytest
 from sklearn.datasets import make_classification
-from sklearn.pipeline import Pipeline
 
 from bxai.selection.boruta_shap import BayesianBorutaSHAP
 from bxai.selection.stability import (
-    calculate_nogueira_stability,
-    calculate_jaccard_stability,
-    cross_val_feature_stability,
     CVStabilityResult,
+    calculate_jaccard_stability,
+    calculate_nogueira_stability,
+    cross_val_feature_stability,
 )
 
 
@@ -38,11 +37,7 @@ def test_calculate_nogueira_stability_mathematical_correctness():
     # sum(s_j^2) = 2/3, avg(s_j^2) = 2/9
     # k_bar/d * (1 - k_bar/d) = 5/9 * 4/9 = 20/81
     # stability = 1 - (2/9) / (20/81) = 1 - 0.9 = 0.1
-    Z = np.array([
-        [1, 0, 0],
-        [1, 1, 0],
-        [1, 0, 1]
-    ])
+    Z = np.array([[1, 0, 0], [1, 1, 0], [1, 0, 1]])
     assert pytest.approx(calculate_nogueira_stability(Z)) == 0.1
 
     # 4. Check error handling
@@ -61,11 +56,7 @@ def test_calculate_jaccard_stability_mathematical_correctness():
     # 0 vs 2: intersection [1,0,0] (1), union [1,0,1] (2) => 0.5
     # 1 vs 2: intersection [1,0,0] (1), union [1,1,1] (3) => 1/3
     # average: (0.5 + 0.5 + 1/3) / 3 = 4/9
-    Z = np.array([
-        [1, 0, 0],
-        [1, 1, 0],
-        [1, 0, 1]
-    ])
+    Z = np.array([[1, 0, 0], [1, 1, 0], [1, 0, 1]])
     assert pytest.approx(calculate_jaccard_stability(Z)) == 4 / 9
 
     # Check zero features Jaccard edge case
@@ -87,11 +78,7 @@ def test_cross_val_feature_stability_validation():
 
 def test_cross_val_feature_stability_integration():
     X, y = make_classification(
-        n_samples=60,
-        n_features=6,
-        n_informative=3,
-        n_redundant=0,
-        random_state=42
+        n_samples=60, n_features=6, n_informative=3, n_redundant=0, random_state=42
     )
 
     # Use BayesianBorutaSHAP as our estimator
@@ -111,6 +98,7 @@ def test_cross_val_feature_stability_integration():
 
     # Test with Pandas DataFrame input to verify feature_names
     import pandas as pd
+
     df_X = pd.DataFrame(X, columns=[f"col_{i}" for i in range(6)])
     result_df = cross_val_feature_stability(selector, df_X, y, cv=3)
     assert result_df.feature_names == [f"col_{i}" for i in range(6)]

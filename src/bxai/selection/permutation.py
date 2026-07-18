@@ -1,15 +1,17 @@
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import SelectorMixin
 from sklearn.metrics import get_scorer
-from typing import Optional, Union, Callable, Any
-from joblib import Parallel, delayed
-
-from bxai._utils.types import FeatureStatus
 from sklearn.utils.validation import check_is_fitted
-from bxai._utils.validation import check_consistent_length
+
 from bxai._engines.normal_ig import NormalIGTracker
+from bxai._utils.types import FeatureStatus
+from bxai._utils.validation import check_consistent_length
 
 
 def _evaluate_shuffled_score(
@@ -68,7 +70,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
     def __init__(
         self,
         model: Any,
-        scoring: Union[str, Callable],
+        scoring: str | Callable,
         n_repeats: int = 30,
         credible_mass: float = 0.95,
         prior_mu: float = 0.0,
@@ -76,7 +78,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         prior_alpha: float = 1e-4,
         prior_beta: float = 1e-4,
         n_jobs: int = 1,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         """
         Parameters
@@ -270,13 +272,19 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
 
         # Compile results
         self.confirmed_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.CONFIRMED
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.CONFIRMED
         ]
         self.rejected_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.REJECTED
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.REJECTED
         ]
         self.tentative_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.TENTATIVE
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.TENTATIVE
         ]
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
 
@@ -310,7 +318,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         """Required by SelectorMixin to power transform() / inverse_transform()."""
         return self.get_support()
 
-    def summary(self, credible_mass: Optional[float] = None) -> pd.DataFrame:
+    def summary(self, credible_mass: float | None = None) -> pd.DataFrame:
         """Return a summary of the features and their permutation decisions.
 
         Parameters
@@ -322,19 +330,21 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         """
         mass = credible_mass if credible_mass is not None else self.credible_mass
         lower, upper = self.tracker_.credible_interval(mass)
-        
+
         data = []
         for i, name in enumerate(self.feature_names_):
             status = self.status_[i]
-            data.append({
-                "feature": name,
-                "status": status.value,
-                "mean": self.tracker_.mu[i],
-                "hdi_lower": lower[i],
-                "hdi_upper": upper[i],
-                "nu": self.tracker_.nu[i],
-                "alpha": self.tracker_.alpha[i],
-                "beta": self.tracker_.beta[i],
-            })
-            
+            data.append(
+                {
+                    "feature": name,
+                    "status": status.value,
+                    "mean": self.tracker_.mu[i],
+                    "hdi_lower": lower[i],
+                    "hdi_upper": upper[i],
+                    "nu": self.tracker_.nu[i],
+                    "alpha": self.tracker_.alpha[i],
+                    "beta": self.tracker_.beta[i],
+                }
+            )
+
         return pd.DataFrame(data)

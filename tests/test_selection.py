@@ -2,11 +2,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
 
+from bxai._utils.types import FeatureStatus
 from bxai.selection.boruta_shap import BayesianBorutaSHAP
 from bxai.selection.permutation import BayesianPermutation
-from bxai._utils.types import FeatureStatus
 
 # Shared fixtures (tiny_Xy, small_Xy, large_Xy, small_rf, large_rf)
 # are provided by tests/conftest.py and injected automatically by pytest.
@@ -15,6 +14,7 @@ from bxai._utils.types import FeatureStatus
 # ===========================================================================
 # Shared helpers
 # ===========================================================================
+
 
 def _informative_indices(n_features: int, n_informative: int) -> np.ndarray:
     """Return the indices that make_classification places the informative features at."""
@@ -29,6 +29,7 @@ def _noise_indices(n_features: int, n_informative: int) -> np.ndarray:
 # ===========================================================================
 # BayesianBorutaSHAP — discrete (Beta-Binomial) mode
 # ===========================================================================
+
 
 class TestBayesianBorutaSHAPDiscrete:
     """Tests for BayesianBorutaSHAP in 'discrete' (Beta-Binomial) mode."""
@@ -58,7 +59,7 @@ class TestBayesianBorutaSHAPDiscrete:
 
         assert hasattr(selector, "iteration_history_")
         assert len(selector.iteration_history_) == selector.n_iterations_
-        
+
         # Check first history entry structure
         first_entry = selector.iteration_history_[0]
         assert "iteration" in first_entry
@@ -93,10 +94,10 @@ class TestBayesianBorutaSHAPDiscrete:
         selector = BayesianBorutaSHAP(mode="discrete", max_iter=5, random_state=42)
         selector.fit(X, y)
 
-        df_wide   = selector.summary(credible_mass=0.95)
+        df_wide = selector.summary(credible_mass=0.95)
         df_narrow = selector.summary(credible_mass=0.50)
 
-        widths_wide   = df_wide["ci_upper"].values   - df_wide["ci_lower"].values
+        widths_wide = df_wide["ci_upper"].values - df_wide["ci_lower"].values
         widths_narrow = df_narrow["ci_upper"].values - df_narrow["ci_lower"].values
         assert (widths_narrow < widths_wide).all(), (
             "A smaller credible_mass must yield strictly narrower credible intervals."
@@ -105,11 +106,12 @@ class TestBayesianBorutaSHAPDiscrete:
     def test_summary_default_equals_constructor_credible_mass(self, small_Xy):
         """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
         X, y = small_Xy
-        selector = BayesianBorutaSHAP(mode="discrete", max_iter=5,
-                                       credible_mass=0.90, random_state=42)
+        selector = BayesianBorutaSHAP(
+            mode="discrete", max_iter=5, credible_mass=0.90, random_state=42
+        )
         selector.fit(X, y)
 
-        df_default  = selector.summary()
+        df_default = selector.summary()
         df_explicit = selector.summary(credible_mass=0.90)
 
         pd.testing.assert_frame_equal(df_default, df_explicit)
@@ -169,15 +171,17 @@ class TestBayesianBorutaSHAPDiscrete:
 
         df = selector.summary()
         confirmed = df[df["status"] == FeatureStatus.CONFIRMED.value]
-        rejected  = df[df["status"] == FeatureStatus.REJECTED.value]
+        rejected = df[df["status"] == FeatureStatus.REJECTED.value]
 
         # Only assert when the selector produced both groups
         if confirmed.empty or rejected.empty:
-            pytest.skip("Selector did not produce both CONFIRMED and REJECTED features — "
-                        "increase max_iter or data size.")
+            pytest.skip(
+                "Selector did not produce both CONFIRMED and REJECTED features — "
+                "increase max_iter or data size."
+            )
 
         mean_confirmed = confirmed["mean"].mean()
-        mean_rejected  = rejected["mean"].mean()
+        mean_rejected = rejected["mean"].mean()
 
         assert mean_confirmed > mean_rejected, (
             f"CONFIRMED posterior mean ({mean_confirmed:.4f}) must exceed "
@@ -206,6 +210,7 @@ class TestBayesianBorutaSHAPDiscrete:
 # BayesianBorutaSHAP — continuous (Normal-IG) mode
 # ===========================================================================
 
+
 class TestBayesianBorutaSHAPContinuous:
     """Tests for BayesianBorutaSHAP in 'continuous' (Normal-IG) mode."""
 
@@ -230,7 +235,7 @@ class TestBayesianBorutaSHAPContinuous:
 
         assert hasattr(selector, "iteration_history_")
         assert len(selector.iteration_history_) == selector.n_iterations_
-        
+
         # Check first history entry structure
         first_entry = selector.iteration_history_[0]
         assert "iteration" in first_entry
@@ -288,13 +293,15 @@ class TestBayesianBorutaSHAPContinuous:
 
         df = selector.summary()
         confirmed = df[df["status"] == FeatureStatus.CONFIRMED.value]
-        rejected  = df[df["status"] == FeatureStatus.REJECTED.value]
+        rejected = df[df["status"] == FeatureStatus.REJECTED.value]
 
         if confirmed.empty or rejected.empty:
-            pytest.skip("Selector did not produce both CONFIRMED and REJECTED features.")
+            pytest.skip(
+                "Selector did not produce both CONFIRMED and REJECTED features."
+            )
 
         mu_confirmed = confirmed["mu"].mean()
-        mu_rejected  = rejected["mu"].mean()
+        mu_rejected = rejected["mu"].mean()
 
         assert mu_confirmed > mu_rejected, (
             f"CONFIRMED posterior mu ({mu_confirmed:.4f}) must exceed "
@@ -336,6 +343,7 @@ class TestBayesianBorutaSHAPContinuous:
 # BayesianPermutation
 # ===========================================================================
 
+
 class TestBayesianPermutation:
     """Tests for BayesianPermutation feature selection."""
 
@@ -346,8 +354,9 @@ class TestBayesianPermutation:
     def test_attributes_exist_after_fit(self, small_Xy, small_rf):
         """Fit must populate confirmed_, rejected_, tentative_, feature_importances_."""
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=5, random_state=42)
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=5, random_state=42
+        )
         selector.fit(X, y)
 
         assert hasattr(selector, "confirmed_")
@@ -358,21 +367,28 @@ class TestBayesianPermutation:
     def test_bayesian_permutation_parallel(self, small_Xy, small_rf):
         """Fit with n_jobs=2 must produce identical results to sequential fit."""
         X, y = small_Xy
-        sel_seq = BayesianPermutation(model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=1, random_state=42)
+        sel_seq = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=1, random_state=42
+        )
         sel_seq.fit(X, y)
 
-        sel_par = BayesianPermutation(model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=2, random_state=42)
+        sel_par = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=5, n_jobs=2, random_state=42
+        )
         sel_par.fit(X, y)
 
-        np.testing.assert_allclose(sel_seq.feature_importances_, sel_par.feature_importances_)
+        np.testing.assert_allclose(
+            sel_seq.feature_importances_, sel_par.feature_importances_
+        )
         assert sel_seq.confirmed_ == sel_par.confirmed_
         assert sel_seq.rejected_ == sel_par.rejected_
 
     def test_summary_structure(self, small_Xy, small_rf):
         """summary() must return a 6-row DataFrame with the expected columns."""
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=5, random_state=42)
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=5, random_state=42
+        )
         selector.fit(X, y)
 
         df = selector.summary()
@@ -384,17 +400,20 @@ class TestBayesianPermutation:
     # credible_mass override
     # -----------------------------------------------------------------------
 
-    def test_summary_credible_mass_override_produces_narrower_interval(self, small_Xy, small_rf):
+    def test_summary_credible_mass_override_produces_narrower_interval(
+        self, small_Xy, small_rf
+    ):
         """Passing a smaller credible_mass to summary() must yield narrower intervals."""
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=10, random_state=42)
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=10, random_state=42
+        )
         selector.fit(X, y)
 
-        df_wide   = selector.summary(credible_mass=0.95)
+        df_wide = selector.summary(credible_mass=0.95)
         df_narrow = selector.summary(credible_mass=0.50)
 
-        widths_wide   = df_wide["hdi_upper"].values   - df_wide["hdi_lower"].values
+        widths_wide = df_wide["hdi_upper"].values - df_wide["hdi_lower"].values
         widths_narrow = df_narrow["hdi_upper"].values - df_narrow["hdi_lower"].values
         assert (widths_narrow < widths_wide).all(), (
             "A smaller credible_mass must yield strictly narrower credible intervals."
@@ -403,11 +422,16 @@ class TestBayesianPermutation:
     def test_summary_default_equals_constructor_credible_mass(self, small_Xy, small_rf):
         """summary() with no argument must equal summary(credible_mass=self.credible_mass)."""
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=5, credible_mass=0.90, random_state=42)
+        selector = BayesianPermutation(
+            model=small_rf,
+            scoring="accuracy",
+            n_repeats=5,
+            credible_mass=0.90,
+            random_state=42,
+        )
         selector.fit(X, y)
 
-        df_default  = selector.summary()
+        df_default = selector.summary()
         df_explicit = selector.summary(credible_mass=0.90)
 
         pd.testing.assert_frame_equal(df_default, df_explicit)
@@ -415,8 +439,9 @@ class TestBayesianPermutation:
     def test_hdi_lower_less_than_upper(self, small_Xy, small_rf):
         """hdi_lower < hdi_upper must hold for every feature."""
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=10, random_state=42)
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=10, random_state=42
+        )
         selector.fit(X, y)
 
         df = selector.summary()
@@ -447,13 +472,15 @@ class TestBayesianPermutation:
 
         df = selector.summary()
         confirmed = df[df["status"] == FeatureStatus.CONFIRMED.value]
-        rejected  = df[df["status"] == FeatureStatus.REJECTED.value]
+        rejected = df[df["status"] == FeatureStatus.REJECTED.value]
 
         if confirmed.empty or rejected.empty:
-            pytest.skip("Selector did not produce both CONFIRMED and REJECTED features.")
+            pytest.skip(
+                "Selector did not produce both CONFIRMED and REJECTED features."
+            )
 
         mean_confirmed = confirmed["mean"].mean()
-        mean_rejected  = rejected["mean"].mean()
+        mean_rejected = rejected["mean"].mean()
 
         assert mean_confirmed > mean_rejected, (
             f"CONFIRMED posterior mean ({mean_confirmed:.4f}) must exceed "
@@ -488,8 +515,9 @@ class TestBayesianPermutation:
         should converge close to the sample mean of the score drops.
         """
         X, y = small_Xy
-        selector = BayesianPermutation(model=small_rf, scoring="accuracy",
-                                        n_repeats=15, random_state=5)
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=15, random_state=5
+        )
         selector.fit(X, y)
 
         # Posterior mu must equal tracker.mu which is the conjugate posterior mean,
@@ -505,32 +533,40 @@ class TestBayesianPermutation:
 
 def test_pipeline_integration(small_Xy, small_rf):
     from sklearn.pipeline import Pipeline
+
     X, y = small_Xy
 
     # Test BayesianBorutaSHAP pipeline integration
-    pipe_boruta = Pipeline([
-        ('selector', BayesianBorutaSHAP(mode='discrete', max_iter=3, random_state=42))
-    ])
+    pipe_boruta = Pipeline(
+        [("selector", BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42))]
+    )
     pipe_boruta.fit(X, y)
     X_trans = pipe_boruta.transform(X)
     assert X_trans.shape[0] == X.shape[0]
 
     # Force all features to be selected to verify non-empty transform
-    selector_boruta = pipe_boruta.named_steps['selector']
+    selector_boruta = pipe_boruta.named_steps["selector"]
     selector_boruta.support_ = np.ones(X.shape[1], dtype=bool)
     X_trans_all = selector_boruta.transform(X)
     assert X_trans_all.shape == X.shape
 
     # Test BayesianPermutation pipeline integration
-    pipe_perm = Pipeline([
-        ('selector', BayesianPermutation(model=small_rf, scoring='accuracy', n_repeats=3, random_state=42))
-    ])
+    pipe_perm = Pipeline(
+        [
+            (
+                "selector",
+                BayesianPermutation(
+                    model=small_rf, scoring="accuracy", n_repeats=3, random_state=42
+                ),
+            )
+        ]
+    )
     pipe_perm.fit(X, y)
     X_trans_perm = pipe_perm.transform(X)
     assert X_trans_perm.shape[0] == X.shape[0]
 
     # Force all features to be selected to verify non-empty transform
-    selector_perm = pipe_perm.named_steps['selector']
+    selector_perm = pipe_perm.named_steps["selector"]
     selector_perm.support_ = np.ones(X.shape[1], dtype=bool)
     X_trans_all_perm = selector_perm.transform(X)
     assert X_trans_all_perm.shape == X.shape

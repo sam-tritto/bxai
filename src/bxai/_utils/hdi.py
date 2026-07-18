@@ -19,19 +19,21 @@ Callers that need to label a summary column (e.g. ``"hdi_lower"`` vs
 ``"ci_lower"``) should read :data:`HDI_LABEL` once at module load time rather
 than inspecting a third return value on every call.
 """
+
 from __future__ import annotations
 
 import numpy as np
-from typing import Tuple
 
 # ---------------------------------------------------------------------------
 # Module-level ArviZ availability probe (runs exactly once per interpreter)
 # ---------------------------------------------------------------------------
+ARVIZ_AVAILABLE: bool
 try:
     import arviz as _az  # noqa: F401  — kept as a reference in this scope
-    ARVIZ_AVAILABLE: bool = True
+
+    ARVIZ_AVAILABLE = True
 except ImportError:
-    ARVIZ_AVAILABLE: bool = False
+    ARVIZ_AVAILABLE = False
 
 #: String label for the interval type produced by :func:`compute_hdi`.
 #: ``"hdi"`` when ArviZ is installed (true Highest Density Interval),
@@ -43,10 +45,11 @@ HDI_LABEL: str = "hdi" if ARVIZ_AVAILABLE else "ci"
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def compute_hdi(
     draws: np.ndarray,
     credible_mass: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute a credible interval from posterior draws.
 
     Uses ArviZ's true Highest Density Interval (HDI) when the package is
@@ -74,6 +77,7 @@ def compute_hdi(
     """
     if ARVIZ_AVAILABLE:
         import arviz as az
+
         # Pass as 3D (1 chain, n_draws, n_features) to avoid the ArviZ
         # FutureWarning about ambiguous (draws, shape) input.
         draws_3d = draws[np.newaxis, ...]  # (1, n_draws, n_features)

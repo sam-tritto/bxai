@@ -12,13 +12,13 @@ Each tier exposes ``(X, y)`` and, where needed, a pre-fitted
 (deterministic) dataset is built once per test session, cutting repeated
 ``make_classification`` and ``fit`` calls.
 """
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
-
 
 # ---------------------------------------------------------------------------
 # CLI option: --skip-slow
@@ -27,6 +27,7 @@ from sklearn.ensemble import RandomForestClassifier
 # Effect: any test marked @pytest.mark.slow (which includes all
 #         @pytest.mark.mcmc tests) is automatically skipped.
 # This lets CI pipelines express intent more legibly than raw -m expressions.
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
@@ -53,6 +54,7 @@ def pytest_collection_modifyitems(
 # Tiny dataset  (n=30, p=4, informative=2)   — hyperparameter validation
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def tiny_Xy() -> tuple[np.ndarray, np.ndarray]:
     """30-sample, 4-feature classification dataset (random_state=0)."""
@@ -78,6 +80,7 @@ def tiny_rf(tiny_Xy) -> RandomForestClassifier:
 # Small dataset  (n=100, p=6, informative=2)  — smoke / structure tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def small_Xy() -> tuple[np.ndarray, np.ndarray]:
     """100-sample, 6-feature classification dataset (random_state=42)."""
@@ -102,6 +105,7 @@ def small_rf(small_Xy) -> RandomForestClassifier:
 # ---------------------------------------------------------------------------
 # Large dataset  (n=300, p=8, informative=2)  — statistical-assertion tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def large_Xy() -> tuple[np.ndarray, np.ndarray]:

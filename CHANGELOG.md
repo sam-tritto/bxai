@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-07-17
 
 ### Fixed
 - **`BayesianBorutaSHAP`: per-iteration random seed now derived from master RNG** —
@@ -125,10 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded test suite for ``BayLIME`` from 1 to 12 tests covering both
   backends, prior injection, convergence checks, and validation error
   handling.
-
-## [0.1.0] - 2026-07-16
-
-### Added
 - Initial project structure scaffolding with `uv` package management.
 - Configuration for dependencies including lightgbm, shap, scipy,
   scikit-learn, and optional groups for xgboost, catboost, and mcmc.

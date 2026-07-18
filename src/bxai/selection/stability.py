@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union, Any, Dict
+from typing import Any
+
 import numpy as np
+from joblib import Parallel, delayed
 from sklearn.base import clone
 from sklearn.model_selection import check_cv
-from joblib import Parallel, delayed
 
 
 @dataclass
@@ -27,12 +28,13 @@ class CVStabilityResult:
     feature_names : list of str or None
         The feature names, if available.
     """
+
     stability_index: float
     jaccard_stability_index: float
     selection_frequencies: np.ndarray
     mean_selected_features: float
     support_matrix: np.ndarray
-    feature_names: Optional[List[str]] = None
+    feature_names: list[str] | None = None
 
 
 def calculate_nogueira_stability(support_matrix: np.ndarray) -> float:
@@ -62,10 +64,10 @@ def calculate_nogueira_stability(support_matrix: np.ndarray) -> float:
 
     # Probability (frequency) of selection for each feature
     p_hat = np.mean(Z, axis=0)
-    
+
     # Average number of selected features per run
     k_bar = np.sum(p_hat)
-    
+
     # If all selections are identical (all 0s or all 1s), variance is 0, so stability is 1.0
     if k_bar == 0.0 or k_bar == d:
         return 1.0
@@ -73,10 +75,10 @@ def calculate_nogueira_stability(support_matrix: np.ndarray) -> float:
     # Unbiased sample variance of each feature selection across the M runs
     # s_j^2 = (M / (M - 1)) * p_hat_j * (1 - p_hat_j)
     var_sum = np.sum(p_hat * (1.0 - p_hat)) * (M / (M - 1.0))
-    
+
     # Nogueira stability index formula
     stability = 1.0 - (var_sum / (k_bar * (1.0 - k_bar / d)))
-    
+
     return float(stability)
 
 
@@ -126,15 +128,15 @@ def _safe_indexing(X: Any, indices: Any) -> Any:
 def _fit_and_select(
     estimator: Any,
     X: Any,
-    y: Optional[Any],
+    y: Any | None,
     train_idx: Any,
-    fit_params: Optional[Dict[str, Any]],
+    fit_params: dict[str, Any] | None,
 ) -> np.ndarray:
     """Clone, fit, and extract support mask for one fold."""
     cloned = clone(estimator)
     X_train = _safe_indexing(X, train_idx)
     y_train = _safe_indexing(y, train_idx) if y is not None else None
-    
+
     cloned.fit(X_train, y_train, **(fit_params or {}))
     return np.asarray(cloned.get_support(), dtype=bool)
 
@@ -142,14 +144,14 @@ def _fit_and_select(
 def cross_val_feature_stability(
     estimator: Any,
     X: Any,
-    y: Optional[Any] = None,
+    y: Any | None = None,
     *,
-    cv: Union[int, Any] = 5,
-    groups: Optional[Any] = None,
-    n_jobs: Optional[int] = None,
+    cv: int | Any = 5,
+    groups: Any | None = None,
+    n_jobs: int | None = None,
     verbose: int = 0,
-    pre_dispatch: Union[str, int] = "2*n_jobs",
-    fit_params: Optional[Dict[str, Any]] = None,
+    pre_dispatch: str | int = "2*n_jobs",
+    fit_params: dict[str, Any] | None = None,
 ) -> CVStabilityResult:
     """Evaluate feature selection stability using cross-validation.
 
@@ -184,7 +186,9 @@ def cross_val_feature_stability(
         A result object containing stability metrics and details.
     """
     if not hasattr(estimator, "get_support"):
-        raise TypeError("estimator must be a feature selector implementing get_support().")
+        raise TypeError(
+            "estimator must be a feature selector implementing get_support()."
+        )
 
     cv_resolved = check_cv(cv, y, classifier=False)
     splits = list(cv_resolved.split(X, y, groups))
@@ -195,7 +199,7 @@ def cross_val_feature_stability(
     )
 
     support_matrix = np.vstack(results)
-    
+
     # Calculate stability metrics
     stability_index = calculate_nogueira_stability(support_matrix)
     jaccard_stability_index = calculate_jaccard_stability(support_matrix)

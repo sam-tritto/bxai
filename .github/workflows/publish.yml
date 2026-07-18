@@ -1,0 +1,37 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  pypi-publish:
+    name: "Build and Publish"
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # Required for Trusted Publishing (OIDC token exchange)
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish package
+        run: uv publish
+        # Note: Trusted Publishing is highly recommended and does not require credentials.
+        # However, if you prefer token-based publishing (e.g. via PyPI API token), 
+        # uncomment the following environment variable declaration:
+        # env:
+        #   UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}

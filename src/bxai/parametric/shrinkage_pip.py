@@ -1,14 +1,13 @@
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import SelectorMixin
 from sklearn.utils.validation import check_is_fitted
-from typing import Optional, List, Dict, Tuple, Union, Any
 
-from bxai._utils.types import FeatureStatus
+from bxai._utils.hdi import HDI_LABEL, compute_hdi
 from bxai._utils.validation import check_consistent_length
-from bxai._utils.hdi import compute_hdi, HDI_LABEL
-
 
 
 class ShrinkagePIP(SelectorMixin, BaseEstimator):
@@ -78,13 +77,13 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         prior: str = "horseshoe",
         pip_method: str = "auto",
         kappa_threshold: float = 0.5,
-        epsilon: Optional[float] = None,
+        epsilon: float | None = None,
         pip_threshold: float = 0.80,
         n_samples: int = 1000,
         tune: int = 1000,
         chains: int = 2,
         progressbar: bool = False,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         self.model_type = model_type
         self.prior = prior
@@ -168,13 +167,13 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
 
         effective_pip_method = self._resolve_pip_method()
 
-        with pm.Model() as model:
+        with pm.Model():
             # Inputs
             X_shared = pm.Data("X", X_arr)
-            
+
             # Intercept prior
             intercept = pm.Normal("intercept", mu=0.0, sigma=10.0)
-            
+
             # Feature coefficient priors
             if self.prior == "horseshoe":
                 # Global shrinkage
@@ -225,15 +224,17 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                     "pip_method='kappa' is only valid with prior='horseshoe'; "
                     "the shrinkage factor \u03ba is not defined for the Lasso prior."
                 )
-            tau_draws = self.trace_.posterior["tau"].values.reshape(-1)  # (total_draws,)
-            lambda_draws = self.trace_.posterior["lambdas"].values.reshape(-1, n_features)  # (total_draws, p)
+            tau_draws = self.trace_.posterior["tau"].values.reshape(
+                -1
+            )  # (total_draws,)
+            lambda_draws = self.trace_.posterior["lambdas"].values.reshape(
+                -1, n_features
+            )  # (total_draws, p)
 
             # \u03ba_j = 1 / (1 + \u03bb_j^2 * \u03c4^2)  in (0, 1)
             # \u03ba_j -> 0: local scale dominates -> signal (not shrunk)
             # \u03ba_j -> 1: global shrinkage dominates -> noise (shrunk to zero)
-            kappa = 1.0 / (
-                1.0 + lambda_draws ** 2 * tau_draws[:, np.newaxis] ** 2
-            )
+            kappa = 1.0 / (1.0 + lambda_draws**2 * tau_draws[:, np.newaxis] ** 2)
             self.kappa_mean_ = np.mean(kappa, axis=0)
             # PIP = P(\u03ba_j < kappa_threshold | data)
             self.pip_ = np.mean(kappa < self.kappa_threshold, axis=0)
@@ -258,7 +259,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         self.rejected_ = [
             self.feature_names_[i] for i, s in enumerate(self.support_) if not s
         ]
-        self.tentative_ = []  # Parametric shrinkage models have no tentative state
+        self.tentative_: list[str] = []  # Parametric shrinkage models have no tentative state
 
         self.feature_importances_ = self.pip_
 
@@ -297,7 +298,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
 
         data = []
         for i, name in enumerate(self.feature_names_):
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 "feature": name,
                 "pip": self.pip_[i],
                 "pip_method": self.pip_method_,

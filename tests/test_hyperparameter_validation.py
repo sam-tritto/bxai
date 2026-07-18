@@ -1,15 +1,16 @@
 """Tests for input validation on hyperparameters across all estimators and engines."""
+
 import warnings
+
 import numpy as np
 import pytest
-from sklearn.ensemble import RandomForestClassifier
 
 from bxai._engines.beta_binomial import BetaBinomialTracker
 from bxai._engines.normal_ig import NormalIGTracker
+from bxai.parametric.bart_importance import BARTImportance
+from bxai.parametric.shrinkage_pip import ShrinkagePIP
 from bxai.selection.boruta_shap import BayesianBorutaSHAP
 from bxai.selection.permutation import BayesianPermutation
-from bxai.parametric.shrinkage_pip import ShrinkagePIP
-from bxai.parametric.bart_importance import BARTImportance
 
 # Shared fixtures (tiny_Xy, tiny_rf) are provided by tests/conftest.py.
 
@@ -17,6 +18,7 @@ from bxai.parametric.bart_importance import BARTImportance
 # ---------------------------------------------------------------------------
 # BetaBinomialTracker — prior constraints
 # ---------------------------------------------------------------------------
+
 
 class TestBetaBinomialTrackerInit:
     def test_prior_alpha_zero_raises(self):
@@ -70,11 +72,15 @@ class TestBetaBinomialTrackerDecide:
         self.tracker = BetaBinomialTracker(n_features=3)
 
     def test_confirm_below_reject_raises(self):
-        with pytest.raises(ValueError, match="confirm_threshold.*must be strictly greater"):
+        with pytest.raises(
+            ValueError, match="confirm_threshold.*must be strictly greater"
+        ):
             self.tracker.decide(confirm_threshold=0.3, reject_threshold=0.7)
 
     def test_confirm_equal_reject_raises(self):
-        with pytest.raises(ValueError, match="confirm_threshold.*must be strictly greater"):
+        with pytest.raises(
+            ValueError, match="confirm_threshold.*must be strictly greater"
+        ):
             self.tracker.decide(confirm_threshold=0.5, reject_threshold=0.5)
 
     def test_confirm_threshold_zero_raises(self):
@@ -102,6 +108,7 @@ class TestBetaBinomialTrackerDecide:
 # NormalIGTracker — prior constraints
 # ---------------------------------------------------------------------------
 
+
 class TestNormalIGTrackerInit:
     def test_prior_nu_zero_raises(self):
         with pytest.raises(ValueError, match="prior_nu must be > 0"):
@@ -128,7 +135,9 @@ class TestNormalIGTrackerInit:
             NormalIGTracker(n_features=2, prior_beta=-1.0)
 
     def test_valid_priors_ok(self):
-        tracker = NormalIGTracker(n_features=3, prior_nu=1e-2, prior_alpha=1e-2, prior_beta=1e-2)
+        tracker = NormalIGTracker(
+            n_features=3, prior_nu=1e-2, prior_alpha=1e-2, prior_beta=1e-2
+        )
         assert tracker.n_features == 3
 
 
@@ -178,6 +187,7 @@ class TestNormalIGTrackerDecide:
 # BayesianBorutaSHAP — estimator-level guards
 # ---------------------------------------------------------------------------
 
+
 class TestBayesianBorutaSHAPValidation:
     def test_credible_mass_zero_raises(self, tiny_Xy):
         X, y = tiny_Xy
@@ -193,14 +203,22 @@ class TestBayesianBorutaSHAPValidation:
 
     def test_confirm_below_reject_raises(self, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(confirm_threshold=0.2, reject_threshold=0.8, max_iter=1)
-        with pytest.raises(ValueError, match="confirm_threshold.*must be strictly greater"):
+        selector = BayesianBorutaSHAP(
+            confirm_threshold=0.2, reject_threshold=0.8, max_iter=1
+        )
+        with pytest.raises(
+            ValueError, match="confirm_threshold.*must be strictly greater"
+        ):
             selector.fit(X, y)
 
     def test_confirm_equal_reject_raises(self, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(confirm_threshold=0.5, reject_threshold=0.5, max_iter=1)
-        with pytest.raises(ValueError, match="confirm_threshold.*must be strictly greater"):
+        selector = BayesianBorutaSHAP(
+            confirm_threshold=0.5, reject_threshold=0.5, max_iter=1
+        )
+        with pytest.raises(
+            ValueError, match="confirm_threshold.*must be strictly greater"
+        ):
             selector.fit(X, y)
 
     def test_prior_alpha_nonpositive_raises(self, tiny_Xy):
@@ -217,13 +235,17 @@ class TestBayesianBorutaSHAPValidation:
 
     def test_prior_alpha_continuous_nonpositive_raises(self, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(prior_alpha_continuous=0.0, mode="continuous", max_iter=1)
+        selector = BayesianBorutaSHAP(
+            prior_alpha_continuous=0.0, mode="continuous", max_iter=1
+        )
         with pytest.raises(ValueError, match="prior_alpha_continuous must be > 0"):
             selector.fit(X, y)
 
     def test_prior_beta_continuous_nonpositive_raises(self, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(prior_beta_continuous=-0.5, mode="continuous", max_iter=1)
+        selector = BayesianBorutaSHAP(
+            prior_beta_continuous=-0.5, mode="continuous", max_iter=1
+        )
         with pytest.raises(ValueError, match="prior_beta_continuous must be > 0"):
             selector.fit(X, y)
 
@@ -244,6 +266,7 @@ class TestBayesianBorutaSHAPValidation:
 # BayesianBorutaSHAP — cross-mode unused-parameter warnings
 # ---------------------------------------------------------------------------
 
+
 class TestBayesianBorutaSHAPCrossModeWarnings:
     """Verify that mode-irrelevant prior parameters trigger UserWarnings."""
 
@@ -256,7 +279,9 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("prior_alpha" in m for m in messages), (
             f"Expected a UserWarning mentioning 'prior_alpha'; got: {messages}"
         )
@@ -268,7 +293,9 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("prior_beta" in m for m in messages), (
             f"Expected a UserWarning mentioning 'prior_beta'; got: {messages}"
         )
@@ -276,11 +303,15 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
     def test_continuous_mode_warns_on_multiple_discrete_priors(self, tiny_Xy):
         """Both prior_alpha and prior_beta non-default → single warning listing both."""
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(mode="continuous", prior_alpha=2.0, prior_beta=0.5, max_iter=1)
+        selector = BayesianBorutaSHAP(
+            mode="continuous", prior_alpha=2.0, prior_beta=0.5, max_iter=1
+        )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("prior_alpha" in m and "prior_beta" in m for m in messages), (
             f"Expected a single UserWarning mentioning both priors; got: {messages}"
         )
@@ -294,7 +325,9 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("prior_nu" in m for m in messages), (
             f"Expected a UserWarning mentioning 'prior_nu'; got: {messages}"
         )
@@ -302,11 +335,15 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
     def test_discrete_mode_warns_on_prior_alpha_continuous(self, tiny_Xy):
         """prior_alpha_continuous has no effect in discrete mode → UserWarning."""
         X, y = tiny_Xy
-        selector = BayesianBorutaSHAP(mode="discrete", prior_alpha_continuous=1.0, max_iter=1)
+        selector = BayesianBorutaSHAP(
+            mode="discrete", prior_alpha_continuous=1.0, max_iter=1
+        )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("prior_alpha_continuous" in m for m in messages), (
             f"Expected a UserWarning mentioning 'prior_alpha_continuous'; got: {messages}"
         )
@@ -320,8 +357,12 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        cross_mode = [w for w in caught if issubclass(w.category, UserWarning)
-                      and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))]
+        cross_mode = [
+            w
+            for w in caught
+            if issubclass(w.category, UserWarning)
+            and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))
+        ]
         assert not cross_mode, (
             f"Unexpected cross-mode UserWarning with default parameters: {cross_mode}"
         )
@@ -333,8 +374,12 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             selector.fit(X, y)
-        cross_mode = [w for w in caught if issubclass(w.category, UserWarning)
-                      and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))]
+        cross_mode = [
+            w
+            for w in caught
+            if issubclass(w.category, UserWarning)
+            and ("NIG" in str(w.message) or "Beta-Binomial" in str(w.message))
+        ]
         assert not cross_mode, (
             f"Unexpected cross-mode UserWarning with default parameters: {cross_mode}"
         )
@@ -343,6 +388,7 @@ class TestBayesianBorutaSHAPCrossModeWarnings:
 # ---------------------------------------------------------------------------
 # BayesianPermutation — estimator-level guards
 # ---------------------------------------------------------------------------
+
 
 class TestBayesianPermutationValidation:
     def test_n_repeats_one_raises(self, tiny_rf, tiny_Xy):
@@ -359,25 +405,33 @@ class TestBayesianPermutationValidation:
 
     def test_credible_mass_zero_raises(self, tiny_rf, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianPermutation(model=tiny_rf, scoring="accuracy", credible_mass=0.0)
+        selector = BayesianPermutation(
+            model=tiny_rf, scoring="accuracy", credible_mass=0.0
+        )
         with pytest.raises(ValueError, match="credible_mass must be in"):
             selector.fit(X, y)
 
     def test_credible_mass_one_raises(self, tiny_rf, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianPermutation(model=tiny_rf, scoring="accuracy", credible_mass=1.0)
+        selector = BayesianPermutation(
+            model=tiny_rf, scoring="accuracy", credible_mass=1.0
+        )
         with pytest.raises(ValueError, match="credible_mass must be in"):
             selector.fit(X, y)
 
     def test_prior_alpha_nonpositive_raises(self, tiny_rf, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianPermutation(model=tiny_rf, scoring="accuracy", prior_alpha=0.0)
+        selector = BayesianPermutation(
+            model=tiny_rf, scoring="accuracy", prior_alpha=0.0
+        )
         with pytest.raises(ValueError, match="prior_alpha must be > 0"):
             selector.fit(X, y)
 
     def test_prior_beta_nonpositive_raises(self, tiny_rf, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianPermutation(model=tiny_rf, scoring="accuracy", prior_beta=-1.0)
+        selector = BayesianPermutation(
+            model=tiny_rf, scoring="accuracy", prior_beta=-1.0
+        )
         with pytest.raises(ValueError, match="prior_beta must be > 0"):
             selector.fit(X, y)
 
@@ -389,7 +443,9 @@ class TestBayesianPermutationValidation:
 
     def test_prior_nu_negative_raises(self, tiny_rf, tiny_Xy):
         X, y = tiny_Xy
-        selector = BayesianPermutation(model=tiny_rf, scoring="accuracy", prior_nu=-1e-4)
+        selector = BayesianPermutation(
+            model=tiny_rf, scoring="accuracy", prior_nu=-1e-4
+        )
         with pytest.raises(ValueError, match="prior_nu must be > 0"):
             selector.fit(X, y)
 
@@ -397,6 +453,7 @@ class TestBayesianPermutationValidation:
 # ---------------------------------------------------------------------------
 # ShrinkagePIP — estimator-level guards
 # ---------------------------------------------------------------------------
+
 
 class TestShrinkagePIPValidation:
     def _make_data(self):
@@ -436,6 +493,7 @@ class TestShrinkagePIPValidation:
 # ---------------------------------------------------------------------------
 # BARTImportance — estimator-level guards
 # ---------------------------------------------------------------------------
+
 
 class TestBARTImportanceValidation:
     def _make_data(self):

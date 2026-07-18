@@ -1,16 +1,17 @@
 import warnings
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, clone
 from sklearn.feature_selection import SelectorMixin
-from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.multiclass import type_of_target
-from typing import Optional, List, Union, Any
+from sklearn.utils.validation import check_is_fitted
 
-from bxai._utils.types import FeatureStatus
-from bxai._utils.validation import check_consistent_length
 from bxai._engines.beta_binomial import BetaBinomialTracker
 from bxai._engines.normal_ig import NormalIGTracker
+from bxai._utils.types import FeatureStatus
+from bxai._utils.validation import check_consistent_length
 
 
 def _default_model(y: np.ndarray) -> Any:
@@ -138,7 +139,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
 
     def __init__(
         self,
-        model: Optional[Any] = None,
+        model: Any | None = None,
         mode: str = "discrete",
         max_iter: int = 100,
         credible_mass: float = 0.95,
@@ -150,7 +151,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         prior_nu: float = 1e-4,
         prior_alpha_continuous: float = 1e-4,
         prior_beta_continuous: float = 1e-4,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         self.model = model
         self.mode = mode
@@ -254,7 +255,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
 
     def fit(self, X: Any, y: Any) -> "BayesianBorutaSHAP":
         """Run the Bayesian Boruta SHAP loop on X and y.
-        
+
         Parameters
         ----------
         X : array-like or pd.DataFrame
@@ -293,6 +294,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         # the stochasticity of the shadow-feature permutation step.
 
         # Initialize engines
+        self.tracker_: BetaBinomialTracker | NormalIGTracker
         if self.mode == "discrete":
             self.tracker_ = BetaBinomialTracker(
                 n_features=n_features,
@@ -309,6 +311,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             )
         else:
             raise ValueError("mode must be 'discrete' or 'continuous'")
+
 
         self.status_ = np.full(n_features, FeatureStatus.TENTATIVE, dtype=object)
         self.n_iterations_ = 0
@@ -353,10 +356,13 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             # Partition active and shadow importances
             active_importances = importances[:n_active]
             shadow_importances = importances[n_active:]
-            max_shadow = np.max(shadow_importances) if len(shadow_importances) > 0 else 0.0
+            max_shadow = (
+                np.max(shadow_importances) if len(shadow_importances) > 0 else 0.0
+            )
 
             if self.mode == "discrete":
                 hits = (active_importances > max_shadow).astype(float)
+                assert isinstance(self.tracker_, BetaBinomialTracker)
                 self.tracker_.update(hits, tentative_indices)
                 self.status_ = self.tracker_.decide(
                     confirm_threshold=self.confirm_threshold,
@@ -374,6 +380,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 # iterations and reliable decisions require significantly more
                 # iterations than discrete mode.  See the class docstring for
                 # guidance on choosing `max_iter` in continuous mode.
+                assert isinstance(self.tracker_, NormalIGTracker)
                 self.tracker_.update(diffs, tentative_indices)
                 self.status_ = self.tracker_.decide(
                     credible_mass=self.credible_mass,
@@ -386,9 +393,11 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 "status": self.status_.copy(),
             }
             if self.mode == "discrete":
+                assert isinstance(self.tracker_, BetaBinomialTracker)
                 hist_entry["alpha"] = self.tracker_.alpha.copy()
                 hist_entry["beta"] = self.tracker_.beta.copy()
             else:
+                assert isinstance(self.tracker_, NormalIGTracker)
                 hist_entry["mu"] = self.tracker_.mu.copy()
                 hist_entry["nu"] = self.tracker_.nu.copy()
                 hist_entry["alpha"] = self.tracker_.alpha.copy()
@@ -397,20 +406,31 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
 
         # Compile final results
         self.confirmed_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.CONFIRMED
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.CONFIRMED
         ]
         self.rejected_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.REJECTED
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.REJECTED
         ]
         self.tentative_ = [
-            self.feature_names_[i] for i, s in enumerate(self.status_) if s == FeatureStatus.TENTATIVE
+            self.feature_names_[i]
+            for i, s in enumerate(self.status_)
+            if s == FeatureStatus.TENTATIVE
         ]
         self.support_ = self.status_ == FeatureStatus.CONFIRMED
 
         if self.mode == "discrete":
-            self.feature_importances_ = self.tracker_.alpha / (self.tracker_.alpha + self.tracker_.beta)
+            assert isinstance(self.tracker_, BetaBinomialTracker)
+            self.feature_importances_ = self.tracker_.alpha / (
+                self.tracker_.alpha + self.tracker_.beta
+            )
         else:
+            assert isinstance(self.tracker_, NormalIGTracker)
             self.feature_importances_ = self.tracker_.mu
+
 
         return self
 
@@ -440,7 +460,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         """Required by SelectorMixin to power transform() / inverse_transform()."""
         return self.get_support()
 
-    def summary(self, credible_mass: Optional[float] = None) -> pd.DataFrame:
+    def summary(self, credible_mass: float | None = None) -> pd.DataFrame:
         """Return a summary of the features and their decisions.
 
         Parameters
@@ -466,12 +486,13 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         """
         mass = credible_mass if credible_mass is not None else self.credible_mass
         lower, upper = self.tracker_.credible_interval(mass)
-        
+
         data = []
         for i, name in enumerate(self.feature_names_):
             status = self.status_[i]
-            
+
             if self.mode == "discrete":
+                assert isinstance(self.tracker_, BetaBinomialTracker)
                 alpha_val = self.tracker_.alpha[i]
                 beta_val = self.tracker_.beta[i]
                 # Beta distribution mean: alpha / (alpha + beta)
@@ -480,6 +501,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 # Equal-tailed (not HDI) — Beta is skewed when α ≠ β
                 interval_keys = {"ci_lower": lower[i], "ci_upper": upper[i]}
             else:
+                assert isinstance(self.tracker_, NormalIGTracker)
                 mean_val = self.tracker_.mu[i]
                 raw_params = {
                     "mu": self.tracker_.mu[i],
@@ -489,13 +511,15 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 }
                 # Symmetric Student-t: equal-tailed == HDI
                 interval_keys = {"hdi_lower": lower[i], "hdi_upper": upper[i]}
-                
-            data.append({
-                "feature": name,
-                "status": status.value,
-                "mean": mean_val,
-                **interval_keys,
-                **raw_params
-            })
-            
+
+            data.append(
+                {
+                    "feature": name,
+                    "status": status.value,
+                    "mean": mean_val,
+                    **interval_keys,
+                    **raw_params,
+                }
+            )
+
         return pd.DataFrame(data)

@@ -1,12 +1,13 @@
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn.base import BaseEstimator
-from typing import Optional, List, Dict, Tuple, Union, Callable, Any
 
-from bxai._utils.validation import check_array_2d
 from bxai._utils.hdi import compute_hdi
-
+from bxai._utils.validation import check_array_2d
 
 
 class BayLIMEExplanation:
@@ -22,18 +23,18 @@ class BayLIMEExplanation:
 
     def __init__(
         self,
-        feature_names: List[str],
+        feature_names: list[str],
         intercept_mean: float,
         intercept_var: float,
         coef_mean: np.ndarray,
         coef_cov: np.ndarray,
         instance: np.ndarray,
-        prediction: Union[float, np.ndarray],
+        prediction: float | np.ndarray,
         credible_mass: float = 0.95,
         backend: str = "analytical",
-        posterior_draws: Optional[np.ndarray] = None,
-        hdi_lower: Optional[np.ndarray] = None,
-        hdi_upper: Optional[np.ndarray] = None,
+        posterior_draws: np.ndarray | None = None,
+        hdi_lower: np.ndarray | None = None,
+        hdi_upper: np.ndarray | None = None,
     ):
         self.feature_names = feature_names
         self.intercept_mean = intercept_mean
@@ -53,7 +54,9 @@ class BayLIMEExplanation:
         self._hdi_lower = hdi_lower
         self._hdi_upper = hdi_upper
 
-    def credible_intervals(self, credible_mass: Optional[float] = None) -> Dict[str, Tuple[float, float]]:
+    def credible_intervals(
+        self, credible_mass: float | None = None
+    ) -> dict[str, tuple[float, float]]:
         """Compute the credible interval bounds for each feature coefficient.
 
         For the analytical backend, uses the Normal marginal posterior.
@@ -66,26 +69,34 @@ class BayLIMEExplanation:
         else:
             q_lower = (1.0 - mass) / 2.0
             q_upper = 1.0 - q_lower
-            lower = np.array([
-                stats.norm.ppf(q_lower, loc=self.coef_mean[i], scale=self.coef_std[i])
-                for i in range(len(self.feature_names))
-            ])
-            upper = np.array([
-                stats.norm.ppf(q_upper, loc=self.coef_mean[i], scale=self.coef_std[i])
-                for i in range(len(self.feature_names))
-            ])
+            lower = np.array(
+                [
+                    stats.norm.ppf(
+                        q_lower, loc=self.coef_mean[i], scale=self.coef_std[i]
+                    )
+                    for i in range(len(self.feature_names))
+                ]
+            )
+            upper = np.array(
+                [
+                    stats.norm.ppf(
+                        q_upper, loc=self.coef_mean[i], scale=self.coef_std[i]
+                    )
+                    for i in range(len(self.feature_names))
+                ]
+            )
 
         return {
             name: (float(lower[i]), float(upper[i]))
             for i, name in enumerate(self.feature_names)
         }
 
-    def as_list(self) -> List[Tuple[str, float]]:
+    def as_list(self) -> list[tuple[str, float]]:
         """Return the explanation as a sorted list of (feature_name, mean_weight) tuples."""
-        pairs = list(zip(self.feature_names, self.coef_mean))
+        pairs = list(zip(self.feature_names, self.coef_mean, strict=False))
         return sorted(pairs, key=lambda x: abs(x[1]), reverse=True)
 
-    def as_dataframe(self, credible_mass: Optional[float] = None) -> pd.DataFrame:
+    def as_dataframe(self, credible_mass: float | None = None) -> pd.DataFrame:
         """Return a summary of local explanation weights as a pandas DataFrame.
 
         Includes posterior mean, standard deviation, credible interval bounds,
@@ -97,22 +108,24 @@ class BayLIMEExplanation:
         data = []
         for idx, name in enumerate(self.feature_names):
             lower, upper = intervals[name]
-            data.append({
-                "feature": name,
-                "mean": self.coef_mean[idx],
-                "std": self.coef_std[idx],
-                "hdi_lower": lower,
-                "hdi_upper": upper,
-                "value": self.instance[idx],
-                "backend": self.backend,
-            })
+            data.append(
+                {
+                    "feature": name,
+                    "mean": self.coef_mean[idx],
+                    "std": self.coef_std[idx],
+                    "hdi_lower": lower,
+                    "hdi_upper": upper,
+                    "value": self.instance[idx],
+                    "backend": self.backend,
+                }
+            )
 
         df = pd.DataFrame(data)
         df["abs_mean"] = df["mean"].abs()
         df = df.sort_values("abs_mean", ascending=False).drop(columns=["abs_mean"])
         return df.reset_index(drop=True)
 
-    def plot(self, credible_mass: Optional[float] = None, max_features: int = 10) -> Any:
+    def plot(self, credible_mass: float | None = None, max_features: int = 10) -> Any:
         """Plot the explanation as a horizontal bar chart with credible intervals.
 
         Requires matplotlib.
@@ -120,7 +133,9 @@ class BayLIMEExplanation:
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError("matplotlib is required to plot explanations. Install it with pip.")
+            raise ImportError(
+                "matplotlib is required to plot explanations. Install it with pip."
+            )
 
         df = self.as_dataframe(credible_mass).head(max_features)
         df = df.iloc[::-1]  # Invert so largest is at the top
@@ -215,11 +230,11 @@ class BayLIME(BaseEstimator):
     def __init__(
         self,
         training_data: Any,
-        feature_names: Optional[List[str]] = None,
+        feature_names: list[str] | None = None,
         kernel_width: float = 0.75,
         num_samples: int = 5000,
-        prior_mean: Optional[np.ndarray] = None,
-        prior_precision: Optional[Union[float, np.ndarray]] = None,
+        prior_mean: np.ndarray | None = None,
+        prior_precision: float | np.ndarray | None = None,
         backend: str = "analytical",
         mcmc_prior: str = "normal",
         mcmc_samples: int = 1000,
@@ -227,7 +242,7 @@ class BayLIME(BaseEstimator):
         mcmc_chains: int = 2,
         progressbar: bool = False,
         perturbation_space: str = "feature_space",
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         # sklearn convention: __init__ only assigns parameters to self.
         # Validation and derived attributes live in _setup(), called lazily
@@ -305,7 +320,7 @@ class BayLIME(BaseEstimator):
         instance: np.ndarray,
         noise_scale: float,
         rng: np.random.Generator,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Generate local neighborhood and compute proximity weights.
 
         Returns
@@ -320,14 +335,16 @@ class BayLIME(BaseEstimator):
             Distance of each sample to the instance.
         """
         if self.perturbation_space == "interpretable":
-            Z_prime = rng.binomial(1, 0.5, size=(self.num_samples, self._n_features)).astype(float)
+            Z_prime = rng.binomial(
+                1, 0.5, size=(self.num_samples, self._n_features)
+            ).astype(float)
             Z_prime[0] = 1.0  # Anchor first sample to all 1s (original instance)
 
             # Perturbed values drawn from feature marginal normal distributions
             Z_perturbed = rng.normal(
                 self.means_[np.newaxis, :],
                 self.stds_[np.newaxis, :],
-                size=(self.num_samples, self._n_features)
+                size=(self.num_samples, self._n_features),
             )
 
             # Combine: original value if active (1.0), else perturbed value
@@ -337,7 +354,9 @@ class BayLIME(BaseEstimator):
             # Distance is in binary space
             Z_normalized = Z_prime - 1.0
         else:
-            noise = rng.normal(0.0, noise_scale, size=(self.num_samples, self._n_features))
+            noise = rng.normal(
+                0.0, noise_scale, size=(self.num_samples, self._n_features)
+            )
             Z = instance + noise * self.stds_
             Z[0] = instance  # anchor first sample to instance
             Z_prime = Z.copy()
@@ -346,7 +365,7 @@ class BayLIME(BaseEstimator):
             Z_normalized = (Z - instance) / self.stds_
 
         distances = np.linalg.norm(Z_normalized, axis=1)
-        proximity_weights = np.exp(-(distances ** 2) / (self.kernel_width ** 2))
+        proximity_weights = np.exp(-(distances**2) / (self.kernel_width**2))
 
         return Z_prime, Z, proximity_weights, distances
 
@@ -373,7 +392,6 @@ class BayLIME(BaseEstimator):
                     f"prior_mean length ({len(prior_m)}) must match n_features ({p})"
                 )
             mu_theta_0[1:] = prior_m
-
 
         # Prior precision matrix
         Sigma_0_inv = np.zeros((p + 1, p + 1))
@@ -587,6 +605,8 @@ class BayLIME(BaseEstimator):
         y = preds if preds.ndim == 1 else preds[:, label]
 
         if self.backend == "analytical":
-            return self._explain_analytical(Z_prime, y, proximity_weights, instance, preds)
+            return self._explain_analytical(
+                Z_prime, y, proximity_weights, instance, preds
+            )
         else:
             return self._explain_mcmc(Z_prime, y, proximity_weights, instance, preds)

@@ -1,15 +1,13 @@
 import numpy as np
-import pytest
-from scipy import stats
 
 from bxai._engines.beta_binomial import BetaBinomialTracker
 from bxai._engines.normal_ig import NormalIGTracker
 from bxai._utils.types import FeatureStatus
 
-
 # ===========================================================================
 # BetaBinomialTracker
 # ===========================================================================
+
 
 class TestBetaBinomialTracker:
     """Tests for the Beta-Binomial conjugate update engine."""
@@ -57,7 +55,9 @@ class TestBetaBinomialTracker:
         """Feature that always wins must have a higher posterior mean than one that always loses."""
         tracker = BetaBinomialTracker(n_features=2)
         for _ in range(15):
-            tracker.update(np.array([1, 0]))  # feature 0 always wins, feature 1 always loses
+            tracker.update(
+                np.array([1, 0])
+            )  # feature 0 always wins, feature 1 always loses
         mean_0 = tracker.alpha[0] / (tracker.alpha[0] + tracker.beta[0])
         mean_1 = tracker.alpha[1] / (tracker.alpha[1] + tracker.beta[1])
         assert mean_0 > mean_1
@@ -107,7 +107,7 @@ class TestBetaBinomialTracker:
         """Beta(3,1): P(θ > 0.5) = 1 − 0.5³ = 0.875."""
         tracker = BetaBinomialTracker(n_features=1, prior_alpha=3.0, prior_beta=1.0)
         prob = tracker.exceedance_probability(0.5)
-        np.testing.assert_allclose(prob[0], 1 - 0.5 ** 3, rtol=1e-6)
+        np.testing.assert_allclose(prob[0], 1 - 0.5**3, rtol=1e-6)
 
     # -----------------------------------------------------------------------
     # Credible interval ordering and bounds
@@ -146,7 +146,9 @@ class TestBetaBinomialTracker:
     def test_alpha_grows_by_exactly_n_hits(self):
         """After n hits, alpha must equal prior_alpha + n."""
         prior_alpha = 2.0
-        tracker = BetaBinomialTracker(n_features=1, prior_alpha=prior_alpha, prior_beta=1.0)
+        tracker = BetaBinomialTracker(
+            n_features=1, prior_alpha=prior_alpha, prior_beta=1.0
+        )
         n_hits = 7
         for _ in range(n_hits):
             tracker.update(np.array([1]))
@@ -155,7 +157,9 @@ class TestBetaBinomialTracker:
     def test_beta_grows_by_exactly_n_misses(self):
         """After n misses, beta must equal prior_beta + n."""
         prior_beta = 3.0
-        tracker = BetaBinomialTracker(n_features=1, prior_alpha=1.0, prior_beta=prior_beta)
+        tracker = BetaBinomialTracker(
+            n_features=1, prior_alpha=1.0, prior_beta=prior_beta
+        )
         n_misses = 5
         for _ in range(n_misses):
             tracker.update(np.array([0]))
@@ -207,6 +211,7 @@ class TestBetaBinomialTracker:
 # NormalIGTracker
 # ===========================================================================
 
+
 class TestNormalIGTracker:
     """Tests for the Normal-Inverse-Gamma conjugate update engine."""
 
@@ -215,8 +220,9 @@ class TestNormalIGTracker:
     # -----------------------------------------------------------------------
 
     def test_initial_state(self):
-        tracker = NormalIGTracker(n_features=2, prior_mu=0.0, prior_nu=1e-2,
-                                   prior_alpha=1e-2, prior_beta=1e-2)
+        tracker = NormalIGTracker(
+            n_features=2, prior_mu=0.0, prior_nu=1e-2, prior_alpha=1e-2, prior_beta=1e-2
+        )
         assert np.all(tracker.mu == 0.0)
 
     # -----------------------------------------------------------------------
@@ -240,11 +246,13 @@ class TestNormalIGTracker:
     def test_directional_separation_between_features(self):
         """Feature 0 (positive data) must have higher posterior mu than feature 1 (negative)."""
         tracker = NormalIGTracker(n_features=2)
-        data = np.array([
-            [1.0, -1.0],
-            [2.0, -2.0],
-            [3.0, -3.0],
-        ])
+        data = np.array(
+            [
+                [1.0, -1.0],
+                [2.0, -2.0],
+                [3.0, -3.0],
+            ]
+        )
         tracker.update(data)
         assert tracker.mu[0] > 0.0
         assert tracker.mu[1] < 0.0
@@ -254,11 +262,13 @@ class TestNormalIGTracker:
         """Feature receiving data with larger mean must converge to a higher posterior mu."""
         tracker = NormalIGTracker(n_features=2)
         # Feature 0: mean ≈ 5; Feature 1: mean ≈ 1
-        data = np.array([
-            [4.5, 0.8],
-            [5.0, 1.0],
-            [5.5, 1.2],
-        ])
+        data = np.array(
+            [
+                [4.5, 0.8],
+                [5.0, 1.0],
+                [5.5, 1.2],
+            ]
+        )
         tracker.update(data)
         assert tracker.mu[0] > tracker.mu[1]
 
@@ -317,7 +327,10 @@ class TestNormalIGTracker:
     def test_credible_interval_for_strongly_positive_feature_is_above_zero(self):
         """After many large positive observations, the 95% CI lower bound must exceed 0."""
         tracker = NormalIGTracker(n_features=1)
-        data = np.full((50, 1), 5.0) + np.random.default_rng(7).standard_normal((50, 1)) * 0.1
+        data = (
+            np.full((50, 1), 5.0)
+            + np.random.default_rng(7).standard_normal((50, 1)) * 0.1
+        )
         tracker.update(data)
         lower, upper = tracker.credible_interval(0.95)
         assert lower[0] > 0.0
@@ -354,7 +367,9 @@ class TestNormalIGTracker:
     def test_zero_mean_feature_tentative(self):
         """Feature with zero-mean data and weak prior stays TENTATIVE under strict thresholds."""
         rng = np.random.default_rng(99)
-        tracker = NormalIGTracker(n_features=1, prior_nu=1e-4, prior_alpha=1e-4, prior_beta=1e-4)
+        tracker = NormalIGTracker(
+            n_features=1, prior_nu=1e-4, prior_alpha=1e-4, prior_beta=1e-4
+        )
         # 5 observations centred at zero — interval straddles zero
         data = rng.standard_normal((5, 1)) * 0.05
         tracker.update(data)
@@ -364,10 +379,12 @@ class TestNormalIGTracker:
     def test_directional_decisions_positive_and_negative(self):
         """Feature 0 (positive) → CONFIRMED; feature 1 (negative) → REJECTED."""
         tracker = NormalIGTracker(n_features=2)
-        data = np.column_stack([
-            np.full(50, 5.0),
-            np.full(50, -5.0),
-        ])
+        data = np.column_stack(
+            [
+                np.full(50, 5.0),
+                np.full(50, -5.0),
+            ]
+        )
         tracker.update(data)
         decisions = tracker.decide(credible_mass=0.95, threshold=0.0)
         assert decisions[0] == FeatureStatus.CONFIRMED

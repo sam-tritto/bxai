@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from bxai.explanation.baylime import BayLIME, BayLIMEExplanation
 
 # Convenience alias — apply to every test that invokes PyMC sampling.
@@ -11,6 +12,7 @@ _slow = pytest.mark.slow
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
 
 def make_data(n=100, p=4, seed=42):
     rng = np.random.default_rng(seed)
@@ -26,6 +28,7 @@ def linear_predict(Z):
 # ---------------------------------------------------------------------------
 # Analytical backend tests
 # ---------------------------------------------------------------------------
+
 
 def test_baylime_analytical_basic():
     training_data = make_data()
@@ -84,7 +87,9 @@ def test_baylime_analytical_as_dataframe():
     df = explanation.as_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 4
-    assert set(["feature", "mean", "std", "hdi_lower", "hdi_upper", "value", "backend"]).issubset(df.columns)
+    assert set(
+        ["feature", "mean", "std", "hdi_lower", "hdi_upper", "value", "backend"]
+    ).issubset(df.columns)
     assert (df["hdi_lower"] < df["hdi_upper"]).all()
     assert (df["backend"] == "analytical").all()
 
@@ -147,6 +152,7 @@ def test_baylime_analytical_bad_mcmc_prior():
 # ---------------------------------------------------------------------------
 # MCMC backend tests
 # ---------------------------------------------------------------------------
+
 
 @_slow
 @_mcmc
@@ -286,6 +292,7 @@ def test_baylime_mcmc_convergence_on_linear_truth():
 # Memory / summary-statistics tests
 # ---------------------------------------------------------------------------
 
+
 def test_baylime_does_not_store_training_array_after_setup():
     """_setup() must not retain the full training array — only means_ and stds_."""
     training_data = make_data(n=200, p=5)
@@ -359,7 +366,7 @@ def test_baylime_interpretable_perturbation_analytical():
     )
     instance = np.random.randn(4)
     explanation = explainer.explain_instance(instance, linear_predict, label=0)
-    
+
     assert isinstance(explanation, BayLIMEExplanation)
     assert len(explanation.coef_mean) == 4
     assert explanation.coef_cov.shape == (4, 4)
@@ -383,7 +390,7 @@ def test_baylime_interpretable_perturbation_mcmc():
     )
     instance = np.random.randn(4)
     explanation = explainer.explain_instance(instance, linear_predict, label=0)
-    
+
     assert isinstance(explanation, BayLIMEExplanation)
     assert len(explanation.coef_mean) == 4
     assert explanation.coef_cov.shape == (4, 4)

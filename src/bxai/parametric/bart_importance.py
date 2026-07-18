@@ -1,18 +1,18 @@
 import base64
 import binascii
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import SelectorMixin
 from sklearn.utils.validation import check_is_fitted
-from typing import Optional, List, Dict, Tuple, Union, Any
 
+from bxai._utils.hdi import HDI_LABEL, compute_hdi
 from bxai._utils.validation import check_consistent_length
-from bxai._utils.hdi import compute_hdi, HDI_LABEL
 
 
-
-def _decode_vi(s: str, length: int) -> List[int]:
+def _decode_vi(s: str, length: int) -> list[int]:
     """Decode a base64-encoded variable-inclusion string to a split-count vector.
 
     Parameters
@@ -45,7 +45,7 @@ def _decode_vi(s: str, length: int) -> List[int]:
             f"(raw value={s!r}, length={length}): {exc}"
         ) from exc
 
-    result: List[int] = []
+    result: list[int] = []
     i = 0
     while len(result) < length and i < len(data):
         num = 0
@@ -91,9 +91,9 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         tune: int = 1000,
         chains: int = 2,
         credible_mass: float = 0.95,
-        baseline_frequency: Optional[float] = None,
+        baseline_frequency: float | None = None,
         progressbar: bool = False,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         self.model_type = model_type
         self.n_trees = n_trees
@@ -122,7 +122,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
 
     def fit(self, X: Any, y: Any) -> "BARTImportance":
         """Fit the BART model using PyMC.
-        
+
         Parameters
         ----------
         X : array-like or pd.DataFrame
@@ -154,14 +154,17 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         else:
             self.baseline_threshold_ = self.baseline_frequency
 
-        with pm.Model() as model:
+        with pm.Model():
             # Fit BART model
             if self.model_type == "regression":
                 mu = pmb.BART("mu", X_arr, y_arr, m=self.n_trees)
-                sigma = pm.HalfNormal("sigma", sigma=np.std(y_arr) if len(y_arr) > 0 else 1.0)
+                sigma = pm.HalfNormal(
+                    "sigma", sigma=np.std(y_arr) if len(y_arr) > 0 else 1.0
+                )
                 pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_arr)
             elif self.model_type == "classification":
                 from sklearn.utils.multiclass import type_of_target
+
                 target_type = type_of_target(y_arr)
                 if target_type != "binary":
                     raise ValueError(
@@ -201,7 +204,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         # than silently returning a zero vector (which would bias
         # vif_distribution_ downward for the affected draw).  We re-raise with
         # the draw index so the user knows exactly which MCMC sample is corrupt.
-        decoded: List[List[int]] = []
+        decoded: list[list[int]] = []
         for draw_idx, val in enumerate(vi_vals):
             try:
                 decoded.append(_decode_vi(val, n_features))
@@ -240,7 +243,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         self.rejected_ = [
             self.feature_names_[i] for i, s in enumerate(self.support_) if not s
         ]
-        self.tentative_ = []
+        self.tentative_: list[str] = []
 
         self.feature_importances_ = self.vif_mean_
 
@@ -284,14 +287,16 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         label = getattr(self, "_interval_label", "hdi")
         data = []
         for i, name in enumerate(self.feature_names_):
-            data.append({
-                "feature": name,
-                "selected": bool(self.support_[i]),
-                "vif_mean": self.vif_mean_[i],
-                "vif_std": self.vif_std_[i],
-                "hdi_lower": self.hdi_lower_[i],
-                "hdi_upper": self.hdi_upper_[i],
-                "baseline_threshold": self.baseline_threshold_,
-                "interval_type": label,
-            })
+            data.append(
+                {
+                    "feature": name,
+                    "selected": bool(self.support_[i]),
+                    "vif_mean": self.vif_mean_[i],
+                    "vif_std": self.vif_std_[i],
+                    "hdi_lower": self.hdi_lower_[i],
+                    "hdi_upper": self.hdi_upper_[i],
+                    "baseline_threshold": self.baseline_threshold_,
+                    "interval_type": label,
+                }
+            )
         return pd.DataFrame(data)

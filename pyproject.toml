@@ -1,7 +1,7 @@
 [project]
 name = "bxai"
 version = "0.1.0"
-description = "Bayesian Feature Attribution and XAI Suite"
+description = "Bayesian Feature Selection and Attribution Suite"
 authors = [
     { name = "sam-tritto", email = "59342606+sam-tritto@users.noreply.github.com" }
 ]

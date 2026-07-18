@@ -4,7 +4,7 @@
   <img src="assets/logo.png" alt="bxai Logo" width="400"/>
 </p>
 
-# Bayesian Feature Attribution and XAI Suite
+# Bayesian Feature Selection and Attribution Suite
 
 A Python package implementing rigorous Bayesian methods for feature selection and model explainability. Where conjugate structure permits, bxai uses closed-form analytical updates (Beta-Binomial, Normal-Inverse-Gamma) to keep iteration fast. Where the model demands full posterior inference — Horseshoe GLMs, BART, and the optional MCMC path in BayLIME; it delegates to PyMC. The result is a unified toolkit that matches computational cost to statistical necessity.
 

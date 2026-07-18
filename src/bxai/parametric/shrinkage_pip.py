@@ -259,7 +259,9 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         self.rejected_ = [
             self.feature_names_[i] for i, s in enumerate(self.support_) if not s
         ]
-        self.tentative_: list[str] = []  # Parametric shrinkage models have no tentative state
+        self.tentative_: list[
+            str
+        ] = []  # Parametric shrinkage models have no tentative state
 
         self.feature_importances_ = self.pip_
 

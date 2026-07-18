@@ -312,7 +312,6 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         else:
             raise ValueError("mode must be 'discrete' or 'continuous'")
 
-
         self.status_ = np.full(n_features, FeatureStatus.TENTATIVE, dtype=object)
         self.n_iterations_ = 0
         self.iteration_history_ = []
@@ -430,7 +429,6 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         else:
             assert isinstance(self.tracker_, NormalIGTracker)
             self.feature_importances_ = self.tracker_.mu
-
 
         return self
 

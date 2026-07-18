@@ -1,7 +1,7 @@
 # bxai
 
 <p align="center">
-  <img src="assets/logo.png" alt="bxai Logo" width="400"/>
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/logo.png" alt="bxai Logo" width="400"/>
 </p>
 
 # Bayesian Feature Selection and Attribution Suite

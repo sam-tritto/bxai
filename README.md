@@ -56,6 +56,32 @@ selector.fit(X, y)
 print("Confirmed Features:", selector.confirmed_)
 ```
 
+### BayesianPermutation
+
+```python
+from bxai.selection import BayesianPermutation
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+
+# Generate synthetic dataset
+X_perm, y_perm = make_classification(n_samples=200, n_features=10, n_informative=3, random_state=42)
+
+clf_perm = RandomForestClassifier(random_state=42).fit(X_perm, y_perm)
+
+# Permutation feature selection with parallel jobs (n_jobs=2)
+selector_perm = BayesianPermutation(
+    model=clf_perm,
+    scoring="accuracy",
+    n_repeats=10,
+    n_jobs=2,
+    random_state=42
+)
+selector_perm.fit(X_perm, y_perm)
+
+print("Confirmed Features:", selector_perm.confirmed_)
+print(selector_perm.summary()[["feature", "mean", "hdi_lower", "hdi_upper", "selected"]])
+```
+
 ### BayLIME
 
 ```python
@@ -108,6 +134,25 @@ selector_lasso = ShrinkagePIP(
 )
 selector_lasso.fit(X, y)
 print(f"Effective epsilon: {selector_lasso.epsilon_:.4f}")
+```
+
+### BARTImportance
+
+```python
+from bxai.parametric import BARTImportance
+from sklearn.datasets import make_regression, make_classification
+
+# Regression example
+X_reg, y_reg = make_regression(n_samples=100, n_features=10, n_informative=3, random_state=42)
+bart_reg = BARTImportance(model_type="regression", n_trees=20, n_samples=200, tune=100, chains=1, random_state=42)
+bart_reg.fit(X_reg, y_reg)
+print("Regression Selected features:", bart_reg.confirmed_)
+
+# Classification example (Probit BART)
+X_clf, y_clf = make_classification(n_samples=100, n_features=10, n_informative=3, random_state=42)
+bart_clf = BARTImportance(model_type="classification", n_trees=20, n_samples=200, tune=100, chains=1, random_state=42)
+bart_clf.fit(X_clf, y_clf)
+print("Classification Selected features:", bart_clf.confirmed_)
 ```
 
 ## License

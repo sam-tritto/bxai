@@ -61,6 +61,10 @@ selector.fit(X, y)
 print("Confirmed Features:", selector.confirmed_)
 ```
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/boruta_shap_viz.png" alt="BayesianBorutaSHAP Visualization" width="600"/>
+</p>
+
 ### BayesianPermutation
 
 ```python
@@ -106,6 +110,10 @@ explanation = explainer.explain_instance(
 
 print(explanation.as_dataframe())
 ```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/baylime_viz.png" alt="BayLIME Visualization" width="600"/>
+</p>
 
 ### ShrinkagePIP
 

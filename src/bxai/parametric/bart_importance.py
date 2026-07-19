@@ -306,3 +306,98 @@ class BARTImportance(SelectorMixin, BaseEstimator):
                 }
             )
         return pd.DataFrame(data)
+
+    def plot(self, max_features: int | None = 15) -> Any:
+        """Plot the Variable Inclusion Frequencies (VIF) and credible intervals.
+
+        Parameters
+        ----------
+        max_features : int or None, default 15
+            Maximum number of features to display (sorted by VIF mean).
+            If None, all features are shown.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The matplotlib figure object.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError(
+                "matplotlib is required to plot. Install it with pip."
+            )
+
+        check_is_fitted(self, "support_")
+        df = self.summary()
+
+        # Sort features by VIF mean ascending (so largest is at the top of the horizontal plot)
+        df = df.sort_values("vif_mean", ascending=True)
+
+        if max_features is not None:
+            df = df.tail(max_features)
+
+        fig, ax = plt.subplots(figsize=(8, max(5, len(df) * 0.4)))
+
+        # Color mapping
+        colors = ["#82B94C" if s else "#CC5555" for s in df["selected"]]
+
+        # Draw a vertical reference line at the baseline threshold
+        ax.axvline(
+            self.baseline_threshold_,
+            color="dimgray",
+            linestyle="--",
+            alpha=0.7,
+            label=f"Baseline ({self.baseline_threshold_:.4f})",
+        )
+
+        for idx, row in enumerate(df.itertuples()):
+            color = colors[idx]
+            mean_val = row.vif_mean
+
+            # Plot horizontal credible interval line
+            ax.hlines(
+                y=idx,
+                xmin=row.hdi_lower,
+                xmax=row.hdi_upper,
+                colors=color,
+                linewidth=1.8,
+            )
+            # Plot posterior mean point
+            ax.plot(
+                mean_val,
+                idx,
+                "o",
+                color=color,
+                markersize=6,
+            )
+
+        ax.set_yticks(range(len(df)))
+        ax.set_yticklabels(df["feature"])
+
+        ax.set_xlabel("Variable Inclusion Frequency (VIF)")
+        ax.set_ylabel("Feature")
+        ax.set_title(
+            f"BART Variable Inclusion Frequencies\n"
+            f"(credible_mass={self.credible_mass})"
+        )
+
+        # Build legend
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+
+        legend_elements = [
+            Patch(facecolor="#82B94C", label="Selected"),
+            Patch(facecolor="#CC5555", label="Not Selected"),
+            Line2D(
+                [0],
+                [0],
+                color="dimgray",
+                linestyle="--",
+                label=f"Baseline ({self.baseline_threshold_:.4f})",
+            ),
+        ]
+        ax.legend(handles=legend_elements, loc="best")
+
+        plt.tight_layout()
+        return fig

@@ -407,3 +407,39 @@ def test_baylime_interpretable_perturbation_mcmc():
     assert explanation.coef_cov.shape == (4, 4)
     assert explanation.backend == "mcmc"
     assert explanation.posterior_draws_.shape == (100, 4)
+
+
+def test_baylime_explanation_plot_runs():
+    """Verify that BayLIMEExplanation.plot() runs without errors (both with and without prior)."""
+    training_data = make_data(n=50, p=4)
+    instance = np.zeros(4)
+
+    # 1. Test without prior
+    explainer_no_prior = BayLIME(
+        training_data=training_data,
+        num_samples=20,
+        backend="analytical",
+        random_state=42,
+    )
+    exp_no_prior = explainer_no_prior.explain_instance(instance, linear_predict, label=0)
+
+    fig1 = exp_no_prior.plot()
+    import matplotlib.pyplot as plt
+    assert isinstance(fig1, plt.Figure)
+    plt.close(fig1)
+
+    # 2. Test with prior
+    prior_mean = np.array([0.5, -0.5, 0.1, 0.0])
+    explainer_with_prior = BayLIME(
+        training_data=training_data,
+        num_samples=20,
+        backend="analytical",
+        prior_mean=prior_mean,
+        random_state=42,
+    )
+    exp_with_prior = explainer_with_prior.explain_instance(instance, linear_predict, label=0)
+
+    fig2 = exp_with_prior.plot()
+    assert isinstance(fig2, plt.Figure)
+    plt.close(fig2)
+

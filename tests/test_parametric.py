@@ -544,6 +544,29 @@ class TestShrinkagePIPIntegration:
             f"({mean_noise_kappa:.3f})"
         )
 
+    def test_plot_raises_if_not_fitted(self):
+        """plot() must raise NotFittedError if estimator is not yet fitted."""
+        from sklearn.exceptions import NotFittedError
+        sel = ShrinkagePIP(model_type="linear", prior="horseshoe")
+        with pytest.raises(NotFittedError):
+            sel.plot()
+
+    def test_plot_runs(self):
+        """plot() must run successfully and return a Figure."""
+        sel = ShrinkagePIP(
+            model_type="linear",
+            prior="horseshoe",
+            n_samples=50,
+            tune=50,
+            chains=1,
+            random_state=42,
+        )
+        sel.fit(self._X, self._y_linear)
+        fig = sel.plot()
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
+
 
 # ===========================================================================
 # BARTImportance — pure-logic helpers (no MCMC)
@@ -911,6 +934,28 @@ class TestBARTImportanceIntegration:
         df = bi.summary()
         assert len(df) == self._P
         assert "selected" in df.columns
+
+    def test_plot_raises_if_not_fitted(self):
+        """plot() must raise NotFittedError if estimator is not yet fitted."""
+        from sklearn.exceptions import NotFittedError
+        bi = BARTImportance(n_trees=3)
+        with pytest.raises(NotFittedError):
+            bi.plot()
+
+    def test_plot_runs(self):
+        """plot() must run successfully and return a Figure."""
+        bi = BARTImportance(
+            n_trees=3,
+            n_samples=50,
+            tune=50,
+            chains=1,
+            random_state=42,
+        )
+        bi.fit(self._X, self._y)
+        fig = bi.plot()
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
 
 
 def test_parametric_pipeline_integration():

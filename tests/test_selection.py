@@ -84,6 +84,24 @@ class TestBayesianBorutaSHAPDiscrete:
         assert "ci_lower" in df.columns
         assert "ci_upper" in df.columns
 
+    def test_plot_raises_if_not_fitted(self):
+        """plot() must raise NotFittedError if estimator is not yet fitted."""
+        from sklearn.exceptions import NotFittedError
+        selector = BayesianBorutaSHAP(mode="discrete")
+        with pytest.raises(NotFittedError):
+            selector.plot()
+
+    def test_plot_runs(self, small_Xy):
+        """plot() must run and return a matplotlib figure without raising exceptions."""
+        X, y = small_Xy
+        selector = BayesianBorutaSHAP(mode="discrete", max_iter=3, random_state=42)
+        selector.fit(X, y)
+
+        fig = selector.plot()
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
+
     # -----------------------------------------------------------------------
     # credible_mass override
     # -----------------------------------------------------------------------
@@ -205,6 +223,15 @@ class TestBayesianBorutaSHAPDiscrete:
             "More iterations must accumulate more evidence in the posterior."
         )
 
+    def test_early_stopping_disabled(self, small_Xy):
+        """Fit must run the full max_iter iterations when early_stopping is False."""
+        X, y = small_Xy
+        selector = BayesianBorutaSHAP(
+            mode="discrete", max_iter=6, early_stopping=False, random_state=42
+        )
+        selector.fit(X, y)
+        assert selector.n_iterations_ == 6
+
 
 # ===========================================================================
 # BayesianBorutaSHAP — continuous (Normal-IG) mode
@@ -226,6 +253,17 @@ class TestBayesianBorutaSHAPContinuous:
 
         df = selector.summary()
         assert "mu" in df.columns
+
+    def test_plot_runs(self, small_Xy):
+        """plot() must run in continuous mode and return a matplotlib figure."""
+        X, y = small_Xy
+        selector = BayesianBorutaSHAP(mode="continuous", max_iter=3, random_state=42)
+        selector.fit(X, y)
+
+        fig = selector.plot()
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
 
     def test_iteration_history_populated(self, small_Xy):
         """Fit must collect iteration history iteration-by-iteration in continuous mode."""
@@ -395,6 +433,26 @@ class TestBayesianPermutation:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 6
         assert "hdi_lower" in df.columns
+
+    def test_plot_raises_if_not_fitted(self, small_rf):
+        """plot() must raise NotFittedError if estimator is not yet fitted."""
+        from sklearn.exceptions import NotFittedError
+        selector = BayesianPermutation(model=small_rf, scoring="accuracy")
+        with pytest.raises(NotFittedError):
+            selector.plot()
+
+    def test_plot_runs(self, small_Xy, small_rf):
+        """plot() must run and return a matplotlib figure without raising exceptions."""
+        X, y = small_Xy
+        selector = BayesianPermutation(
+            model=small_rf, scoring="accuracy", n_repeats=5, random_state=42
+        )
+        selector.fit(X, y)
+
+        fig = selector.plot()
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
 
     # -----------------------------------------------------------------------
     # credible_mass override

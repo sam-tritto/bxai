@@ -348,3 +348,112 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
             )
 
         return pd.DataFrame(data)
+
+    def plot(
+        self,
+        credible_mass: float | None = None,
+        max_features: int | None = 15,
+    ) -> Any:
+        """Plot the Bayesian Permutation Importance of features with credible intervals.
+
+        Parameters
+        ----------
+        credible_mass : float or None, optional
+            The probability mass to include in the credible interval.
+            Defaults to the credible_mass specified at construction.
+        max_features : int or None, default 15
+            Maximum number of features to display (sorted by absolute mean importance).
+            If None, all features are shown.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The matplotlib figure object.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError(
+                "matplotlib is required to plot. Install it with pip."
+            )
+
+        check_is_fitted(self, "support_")
+        df = self.summary(credible_mass)
+
+        # Sort features by mean value (largest drop at the top of the plot)
+        df = df.sort_values("mean", ascending=True)
+
+        if max_features is not None:
+            df = df.tail(max_features)
+
+        fig, ax = plt.subplots(figsize=(8, max(5, len(df) * 0.4)))
+
+        # Color mapping (cool/pastel tones, matching user preferences)
+        colors = {
+            "Confirmed": "#82B94C",
+            "Tentative": "#E8B84B",
+            "Rejected": "#CC5555",
+        }
+
+        # Draw a vertical reference line at 0.0 (no impact on score)
+        ax.axvline(
+            0.0, color="dimgray", linestyle="--", alpha=0.7, label="No Impact (0.0)"
+        )
+
+        for idx, row in enumerate(df.itertuples()):
+            color = colors.get(row.status, "#999999")
+            mean_val = row.mean
+
+            # Plot horizontal credible interval line
+            ax.hlines(
+                y=idx,
+                xmin=row.hdi_lower,
+                xmax=row.hdi_upper,
+                colors=color,
+                linewidth=1.8,
+            )
+            # Plot posterior mean point
+            ax.plot(
+                mean_val,
+                idx,
+                "o",
+                color=color,
+                markersize=6,
+            )
+
+        ax.set_yticks(range(len(df)))
+        ax.set_yticklabels(df["feature"])
+
+        # Determine metric name/scoring description for x-axis label
+        scoring_desc = (
+            self.scoring
+            if isinstance(self.scoring, str)
+            else getattr(self.scoring, "__name__", "custom metric")
+        )
+        ax.set_xlabel(f"Score Drop when Permuted (Metric: {scoring_desc})")
+        ax.set_ylabel("Feature")
+        ax.set_title(
+            f"Bayesian Permutation Importance\n"
+            f"(credible_mass={credible_mass or self.credible_mass})"
+        )
+
+        # Add custom legend
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+
+        legend_elements = [
+            Patch(facecolor="#82B94C", label="Confirmed"),
+            Patch(facecolor="#E8B84B", label="Tentative"),
+            Patch(facecolor="#CC5555", label="Rejected"),
+            Line2D(
+                [0],
+                [0],
+                color="dimgray",
+                linestyle="--",
+                label="No Impact (0.0)",
+            ),
+        ]
+        ax.legend(handles=legend_elements, loc="best")
+
+        plt.tight_layout()
+        return fig

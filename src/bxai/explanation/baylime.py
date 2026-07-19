@@ -35,6 +35,7 @@ class BayLIMEExplanation:
         posterior_draws: np.ndarray | None = None,
         hdi_lower: np.ndarray | None = None,
         hdi_upper: np.ndarray | None = None,
+        prior_mean: np.ndarray | None = None,
     ):
         self.feature_names = feature_names
         self.intercept_mean = intercept_mean
@@ -46,6 +47,7 @@ class BayLIMEExplanation:
         self.prediction = prediction
         self.credible_mass = credible_mass
         self.backend = backend
+        self.prior_mean = prior_mean
 
         # MCMC-only: raw posterior draws over coefficients (shape: n_draws x n_features)
         self.posterior_draws_ = posterior_draws
@@ -108,17 +110,18 @@ class BayLIMEExplanation:
         data = []
         for idx, name in enumerate(self.feature_names):
             lower, upper = intervals[name]
-            data.append(
-                {
-                    "feature": name,
-                    "mean": self.coef_mean[idx],
-                    "std": self.coef_std[idx],
-                    "hdi_lower": lower,
-                    "hdi_upper": upper,
-                    "value": self.instance[idx],
-                    "backend": self.backend,
-                }
-            )
+            entry = {
+                "feature": name,
+                "mean": self.coef_mean[idx],
+                "std": self.coef_std[idx],
+                "hdi_lower": lower,
+                "hdi_upper": upper,
+                "value": self.instance[idx],
+                "backend": self.backend,
+            }
+            if self.prior_mean is not None:
+                entry["prior_mean"] = self.prior_mean[idx]
+            data.append(entry)
 
         df = pd.DataFrame(data)
         df["abs_mean"] = df["mean"].abs()
@@ -126,9 +129,9 @@ class BayLIMEExplanation:
         return df.reset_index(drop=True)
 
     def plot(self, credible_mass: float | None = None, max_features: int = 10) -> Any:
-        """Plot the explanation as a horizontal bar chart with credible intervals.
+        """Plot the explanation with credible intervals.
 
-        Requires matplotlib.
+        If a prior is present, shows the global prior alongside the local posterior.
         """
         try:
             import matplotlib.pyplot as plt
@@ -142,28 +145,91 @@ class BayLIMEExplanation:
 
         fig, ax = plt.subplots(figsize=(8, len(df) * 0.4 + 1.5))
 
-        errors_lower = df["mean"] - df["hdi_lower"]
-        errors_upper = df["hdi_upper"] - df["mean"]
-        xerr = np.vstack([errors_lower, errors_upper])
+        # Color mapping (cool tones)
+        # Blue for positive, Red for negative
+        colors = ["#4A90E2" if m >= 0 else "#D0021B" for m in df["mean"]]
 
-        colors = ["#1f77b4" if m >= 0 else "#d62728" for m in df["mean"]]
+        # Custom y-axis labels showing both feature name and value
+        y_labels = [f"{row.feature} = {row.value:.4g}" for row in df.itertuples()]
 
-        ax.barh(
-            df["feature"],
-            df["mean"],
-            xerr=xerr,
-            color=colors,
-            alpha=0.8,
-            error_kw={"ecolor": "dimgray", "capsize": 3, "lw": 1.5},
-        )
+        # Plot vertical reference line at 0.0
+        ax.axvline(0.0, color="dimgray", linestyle="--", alpha=0.5)
 
-        ax.axvline(0, color="black", linestyle="--", linewidth=1)
+        for idx, row in enumerate(df.itertuples()):
+            color = colors[idx]
+            mean_val = row.mean
+            err_lower = mean_val - row.hdi_lower
+            err_upper = row.hdi_upper - mean_val
+
+            # Plot horizontal error bar (HDI) and point (Mean)
+            ax.errorbar(
+                mean_val,
+                idx,
+                xerr=[[err_lower], [err_upper]],
+                fmt="o",
+                color=color,
+                ecolor=color,
+                capsize=3,
+                markersize=6,
+                elinewidth=1.5,
+            )
+
+            # If prior exists, plot it on the same line as a hollow diamond
+            if "prior_mean" in df.columns:
+                ax.plot(
+                    row.prior_mean,
+                    idx,
+                    marker="d",
+                    markerfacecolor="none",
+                    markeredgecolor="#7ED321",  # distinct green for prior
+                    markeredgewidth=1.5,
+                    markersize=7,
+                )
+
+        ax.set_yticks(range(len(df)))
+        ax.set_yticklabels(y_labels)
+
         ax.set_xlabel("Local Feature Importance (Posterior Mean)")
+
         backend_label = f"backend={self.backend}"
         ax.set_title(
-            f"BayLIME Explanation "
-            f"(credible_mass={credible_mass if credible_mass else self.credible_mass}, {backend_label})"
+            f"BayLIME Local Explanation\n"
+            f"(credible_mass={credible_mass or self.credible_mass}, {backend_label})"
         )
+
+        # Build legend
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+
+        legend_elements = [
+            Patch(facecolor="#4A90E2", label="Positive Impact"),
+            Patch(facecolor="#D0021B", label="Negative Impact"),
+        ]
+        if "prior_mean" in df.columns:
+            legend_elements.append(
+                Line2D(
+                    [0],
+                    [0],
+                    marker="d",
+                    color="w",
+                    markerfacecolor="none",
+                    markeredgecolor="#7ED321",
+                    markeredgewidth=1.5,
+                    markersize=7,
+                    label="Global Prior Mean",
+                )
+            )
+        legend_elements.append(
+            Line2D(
+                [0],
+                [0],
+                color="dimgray",
+                linestyle="--",
+                label="No Impact",
+            )
+        )
+        ax.legend(handles=legend_elements, loc="best")
+
         plt.tight_layout()
         return fig
 
@@ -439,6 +505,7 @@ class BayLIME(BaseEstimator):
             instance=instance,
             prediction=preds[0],
             backend="analytical",
+            prior_mean=self.prior_mean,
         )
 
     def _explain_mcmc(
@@ -568,6 +635,7 @@ class BayLIME(BaseEstimator):
             posterior_draws=coef_flat,
             hdi_lower=hdi_lower,
             hdi_upper=hdi_upper,
+            prior_mean=self.prior_mean,
         )
 
     def explain_instance(

@@ -325,3 +325,105 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 row["epsilon"] = self.epsilon_
             data.append(row)
         return pd.DataFrame(data)
+
+    def plot(self, max_features: int | None = 15) -> Any:
+        """Plot the Posterior Inclusion Probabilities (PIP) and coefficient HDIs.
+
+        Parameters
+        ----------
+        max_features : int or None, default 15
+            Maximum number of features to display (sorted by PIP).
+            If None, all features are shown.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The matplotlib figure object.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError(
+                "matplotlib is required to plot. Install it with pip."
+            )
+
+        check_is_fitted(self, "support_")
+        df = self.summary()
+
+        # Sort features by PIP ascending (so largest is at the top of the horizontal plot)
+        df = df.sort_values("pip", ascending=True)
+
+        if max_features is not None:
+            df = df.tail(max_features)
+
+        # Create two subplots side-by-side sharing the y-axis
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=(12, max(5, len(df) * 0.4)), sharey=True
+        )
+
+        # Color mapping
+        colors = ["#82B94C" if s else "#CC5555" for s in df["selected"]]
+
+        # -------------------------------------------------------------
+        # Subplot 1: Posterior Inclusion Probability (PIP)
+        # -------------------------------------------------------------
+        ax1.barh(df["feature"], df["pip"], color=colors, alpha=0.8, height=0.6)
+        ax1.axvline(
+            self.pip_threshold,
+            color="dimgray",
+            linestyle="--",
+            alpha=0.7,
+            label=f"Threshold ({self.pip_threshold})",
+        )
+        ax1.set_xlim(0, 1.05)
+        ax1.set_xlabel("Posterior Inclusion Probability (PIP)")
+        ax1.set_title("Feature Inclusion (PIP)")
+        ax1.legend(loc="lower right")
+
+        # -------------------------------------------------------------
+        # Subplot 2: Coefficient Posterior Mean and HDI
+        # -------------------------------------------------------------
+        ax2.axvline(0.0, color="dimgray", linestyle="--", alpha=0.5)
+
+        for idx, row in enumerate(df.itertuples()):
+            color = colors[idx]
+            mean_val = row.mean
+
+            # Plot horizontal credible interval line
+            ax2.hlines(
+                y=idx,
+                xmin=row.hdi_lower,
+                xmax=row.hdi_upper,
+                colors=color,
+                linewidth=1.8,
+            )
+            # Plot posterior mean point
+            ax2.plot(
+                mean_val,
+                idx,
+                "o",
+                color=color,
+                markersize=6,
+            )
+
+        ax2.set_xlabel("Coefficient Value (\u03b2)")
+        ax2.set_title("Coefficient Effect Size (\u03b2 and 95% HDI)")
+
+        # Custom legend for selection status
+        from matplotlib.patches import Patch
+
+        legend_elements = [
+            Patch(facecolor="#82B94C", label="Selected"),
+            Patch(facecolor="#CC5555", label="Not Selected"),
+        ]
+        ax2.legend(handles=legend_elements, loc="best")
+
+        fig.suptitle(
+            f"ShrinkagePIP Selection (prior={self.prior}, model={self.model_type})",
+            fontsize=13,
+            fontweight="bold",
+            y=0.98,
+        )
+        plt.tight_layout()
+        return fig
+

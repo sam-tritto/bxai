@@ -151,6 +151,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         prior_nu: float = 1e-4,
         prior_alpha_continuous: float = 1e-4,
         prior_beta_continuous: float = 1e-4,
+        early_stopping: bool = True,
         random_state: int | None = None,
     ):
         self.model = model
@@ -165,6 +166,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         self.prior_nu = prior_nu
         self.prior_alpha_continuous = prior_alpha_continuous
         self.prior_beta_continuous = prior_beta_continuous
+        self.early_stopping = early_stopping
         self.random_state = random_state
 
     # ------------------------------------------------------------------
@@ -363,10 +365,11 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 hits = (active_importances > max_shadow).astype(float)
                 assert isinstance(self.tracker_, BetaBinomialTracker)
                 self.tracker_.update(hits, tentative_indices)
-                self.status_ = self.tracker_.decide(
-                    confirm_threshold=self.confirm_threshold,
-                    reject_threshold=self.reject_threshold,
-                )
+                if self.early_stopping:
+                    self.status_ = self.tracker_.decide(
+                        confirm_threshold=self.confirm_threshold,
+                        reject_threshold=self.reject_threshold,
+                    )
             elif self.mode == "continuous":
                 diffs = active_importances - max_shadow
                 # NOTE: `diffs` is a 1-D array of length n_active.  The
@@ -381,10 +384,11 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 # guidance on choosing `max_iter` in continuous mode.
                 assert isinstance(self.tracker_, NormalIGTracker)
                 self.tracker_.update(diffs, tentative_indices)
-                self.status_ = self.tracker_.decide(
-                    credible_mass=self.credible_mass,
-                    threshold=0.0,
-                )
+                if self.early_stopping:
+                    self.status_ = self.tracker_.decide(
+                        credible_mass=self.credible_mass,
+                        threshold=0.0,
+                    )
 
             # Record history
             hist_entry = {
@@ -404,6 +408,20 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             self.iteration_history_.append(hist_entry)
 
         # Compile final results
+        if not self.early_stopping:
+            if self.mode == "discrete":
+                assert isinstance(self.tracker_, BetaBinomialTracker)
+                self.status_ = self.tracker_.decide(
+                    confirm_threshold=self.confirm_threshold,
+                    reject_threshold=self.reject_threshold,
+                )
+            elif self.mode == "continuous":
+                assert isinstance(self.tracker_, NormalIGTracker)
+                self.status_ = self.tracker_.decide(
+                    credible_mass=self.credible_mass,
+                    threshold=0.0,
+                )
+
         self.confirmed_ = [
             self.feature_names_[i]
             for i, s in enumerate(self.status_)
@@ -521,3 +539,120 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
             )
 
         return pd.DataFrame(data)
+
+    def plot(
+        self,
+        credible_mass: float | None = None,
+        max_features: int | None = None,
+    ) -> Any:
+        """Plot the feature selection results with their credible intervals.
+
+        Parameters
+        ----------
+        credible_mass : float or None, optional
+            The probability mass to include in the credible interval.
+            Defaults to the credible_mass specified at construction.
+        max_features : int or None, optional
+            Maximum number of features to display (sorted by absolute mean importance).
+            If None, all features are shown.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The matplotlib figure object.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError(
+                "matplotlib is required to plot. Install it with pip."
+            )
+
+        check_is_fitted(self, "support_")
+        df = self.summary(credible_mass)
+
+        # Sort features by absolute mean value descending
+        df["abs_mean"] = df["mean"].abs()
+        df = df.sort_values("abs_mean", ascending=False).drop(columns=["abs_mean"])
+
+        if max_features is not None:
+            df = df.head(max_features)
+
+        lower_col = "ci_lower" if self.mode == "discrete" else "hdi_lower"
+        upper_col = "ci_upper" if self.mode == "discrete" else "hdi_upper"
+
+        # Create a nice layout. If there are many features, make the figure wider.
+        fig_width = max(8, len(df) * 0.4)
+        fig, ax = plt.subplots(figsize=(fig_width, 6))
+
+        # Color mapping (cool/pastel tones, not raw primary red/green/blue)
+        colors = {
+            "Confirmed": "#82B94C",
+            "Tentative": "#E8B84B",
+            "Rejected": "#CC5555",
+        }
+
+        for idx, row in enumerate(df.itertuples()):
+            color = colors.get(row.status, "#999999")
+            mean_val = row.mean
+            err_lower = mean_val - getattr(row, lower_col)
+            err_upper = getattr(row, upper_col) - mean_val
+
+            # Plot the line (CI) and marker (mean) vertically
+            ax.errorbar(
+                idx,
+                mean_val,
+                yerr=[[err_lower], [err_upper]],
+                fmt="o",
+                color=color,
+                ecolor=color,
+                capsize=4,
+                markersize=6,
+                elinewidth=1.8,
+            )
+
+        if self.mode == "discrete":
+            ax.axhline(
+                0.5,
+                color="dimgray",
+                linestyle="--",
+                alpha=0.7,
+                label="Random Chance (0.5)",
+            )
+        else:
+            ax.axhline(0.0, color="dimgray", linestyle="--", alpha=0.7)
+
+        ax.set_xticks(range(len(df)))
+        ax.set_xticklabels(df["feature"], rotation=45, ha="right")
+
+        y_label = (
+            "Posterior Mean Hit Rate"
+            if self.mode == "discrete"
+            else "Posterior Mean Importance Difference"
+        )
+        ax.set_ylabel(y_label)
+        ax.set_title(
+            f"BayesianBorutaSHAP Feature Selection\n"
+            f"(mode={self.mode}, credible_mass={credible_mass or self.credible_mass})"
+        )
+
+        # Add custom legend
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+
+        legend_elements = [
+            Patch(facecolor="#82B94C", label="Confirmed"),
+            Patch(facecolor="#E8B84B", label="Tentative"),
+            Patch(facecolor="#CC5555", label="Rejected"),
+            Line2D(
+                [0],
+                [0],
+                color="dimgray",
+                linestyle="--",
+                label="Random Chance (0.5)" if self.mode == "discrete" else "Zero Difference",
+            ),
+        ]
+        ax.legend(handles=legend_elements, loc="best")
+
+        plt.tight_layout()
+        return fig

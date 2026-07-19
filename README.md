@@ -88,6 +88,10 @@ print("Confirmed Features:", selector_perm.confirmed_)
 print(selector_perm.summary()[["feature", "mean", "hdi_lower", "hdi_upper", "status"]])
 ```
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/permutation_viz.png" alt="BayesianPermutation Visualization" width="600"/>
+</p>
+
 ### BayLIME
 
 ```python
@@ -135,6 +139,14 @@ selector_hs.fit(X, y)
 
 print("Selected features (Horseshoe):", selector_hs.confirmed_)
 print(selector_hs.summary()[["feature", "pip", "kappa_mean", "selected"]])
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/shrinkage_hs_viz.png" alt="Horseshoe Prior PIP Visualization" width="600"/>
+</p>
+
+```python
+from bxai.parametric import ShrinkagePIP
 
 # Lasso prior — uses auto-scaled |β| threshold (epsilon = 0.1 on log-odds scale)
 selector_lasso = ShrinkagePIP(
@@ -149,6 +161,10 @@ print(f"Effective epsilon: {selector_lasso.epsilon_:.4f}")
 print("Selected features (Lasso):", selector_lasso.confirmed_)
 ```
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/shrinkage_lasso_viz.png" alt="Lasso Prior Coefficient Effect Visualization" width="600"/>
+</p>
+
 ### BARTImportance
 
 ```python
@@ -159,6 +175,10 @@ bart_clf = BARTImportance(model_type="classification", n_trees=20, n_samples=200
 bart_clf.fit(X, y)
 print("Classification Selected features:", bart_clf.confirmed_)
 ```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/bart_importance_viz.png" alt="BART Variable Inclusion Frequencies" width="600"/>
+</p>
 
 ## License
 

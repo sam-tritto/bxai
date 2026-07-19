@@ -201,7 +201,7 @@ class BayLIMEExplanation:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
 
-        legend_elements = [
+        legend_elements: list[Any] = [
             Patch(facecolor="#4A90E2", label="Positive Impact"),
             Patch(facecolor="#D0021B", label="Negative Impact"),
         ]

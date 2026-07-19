@@ -40,6 +40,14 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         * linear model   → ε = std(y) / 10  (one-tenth of the response SD)
         * logistic model → ε = 0.1          (on the log-odds scale)
 
+        .. note::
+            Since the Lasso prior has continuous support, posterior coefficients for
+            uninformative (noise) features will not be exactly zero. If the posterior
+            credible interval for a coefficient is wide (high uncertainty), the probability
+            that its draws fall outside the narrow region [-ε, ε] will be high, leading
+            to a high PIP. To achieve a sparser selection with Lasso, consider raising
+            ``epsilon`` manually or using a higher ``pip_threshold``.
+
     Parameters
     ----------
     model_type : {'linear', 'logistic'}, default 'linear'
@@ -187,8 +195,10 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 tau = pm.HalfCauchy("tau", beta=1.0)
                 # Local shrinkage
                 lambdas = pm.HalfCauchy("lambdas", beta=1.0, shape=n_features)
-                # Coefficients
-                beta = pm.Normal("beta", mu=0.0, sigma=tau * lambdas, shape=n_features)
+                # Non-centered helper variable
+                beta_raw = pm.Normal("beta_raw", mu=0.0, sigma=1.0, shape=n_features)
+                # Non-centered coefficients
+                beta = pm.Deterministic("beta", beta_raw * tau * lambdas)
             elif self.prior == "lasso":
                 # Lasso corresponds to a Laplace prior
                 b = pm.HalfCauchy("b", beta=1.0)
@@ -210,6 +220,10 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 raise ValueError("model_type must be 'linear' or 'logistic'")
 
             # Draw samples
+            sample_kwargs = {}
+            if self.prior == "horseshoe":
+                sample_kwargs["target_accept"] = 0.95
+
             self.trace_ = pm.sample(
                 draws=self.n_samples,
                 tune=self.tune,
@@ -218,6 +232,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
                 random_seed=self.random_state,
                 progressbar=self.progressbar,
                 return_inferencedata=True,
+                **sample_kwargs,
             )
 
         # ---- Extract posterior draws ----
@@ -250,7 +265,9 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
 
         else:  # threshold
             self.epsilon_ = self._resolve_epsilon(y_arr)
-            # P(|\u03b2_j| > \u03b5 | data)
+            # P(|\u03b2_j| > \u03b5 | data). Note: features with high posterior
+            # uncertainty (wide HDIs) will naturally have high PIP values here,
+            # as most posterior draws will lie outside the small range [-epsilon, epsilon].
             self.pip_ = np.mean(np.abs(self.beta_flat_) > self.epsilon_, axis=0)
             self.kappa_mean_ = None  # not applicable
 

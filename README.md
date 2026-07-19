@@ -69,11 +69,12 @@ from sklearn.ensemble import RandomForestClassifier
 
 clf_perm = RandomForestClassifier(random_state=42).fit(X, y)
 
-# Permutation feature selection with parallel jobs (n_jobs=2)
+# Permutation feature selection with parallel jobs (n_jobs=2) and ROPE (Region of Practical Equivalence)
 selector_perm = BayesianPermutation(
     model=clf_perm,
     scoring="accuracy",
     n_repeats=10,
+    rope=0.001,  # CIs inside [-0.001, 0.001] or entirely below -0.001 are Rejected
     n_jobs=2,
     random_state=42
 )

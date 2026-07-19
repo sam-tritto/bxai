@@ -389,3 +389,34 @@ class TestNormalIGTracker:
         decisions = tracker.decide(credible_mass=0.95, threshold=0.0)
         assert decisions[0] == FeatureStatus.CONFIRMED
         assert decisions[1] == FeatureStatus.REJECTED
+
+    def test_rope_decisions(self):
+        """Test decide with a ROPE parameter (both float and tuple)."""
+        tracker = NormalIGTracker(n_features=4)
+        tracker.alpha = np.full(4, 50.0)
+        tracker.nu = np.full(4, 100.0)
+        tracker.beta = np.full(4, 1e-8)
+
+        # Means:
+        tracker.mu = np.array([0.003, 0.0, 0.001, -0.003])
+
+        decisions_float = tracker.decide(credible_mass=0.95, rope=0.001)
+        assert decisions_float[0] == FeatureStatus.CONFIRMED
+        assert decisions_float[1] == FeatureStatus.REJECTED
+        assert decisions_float[2] == FeatureStatus.TENTATIVE
+        assert decisions_float[3] == FeatureStatus.REJECTED
+
+        # Test tuple rope: (-0.001, 0.002)
+        decisions_tuple = tracker.decide(credible_mass=0.95, rope=(-0.001, 0.002))
+        assert decisions_tuple[0] == FeatureStatus.CONFIRMED
+        assert decisions_tuple[1] == FeatureStatus.REJECTED
+        assert decisions_tuple[2] == FeatureStatus.REJECTED
+        assert decisions_tuple[3] == FeatureStatus.REJECTED
+
+        # Test validation of invalid ROPE boundaries
+        with self.assertRaises(ValueError) if hasattr(self, "assertRaises") else np.testing.assert_raises(ValueError):
+            tracker.decide(credible_mass=0.95, rope=-0.001)
+        with self.assertRaises(ValueError) if hasattr(self, "assertRaises") else np.testing.assert_raises(ValueError):
+            tracker.decide(credible_mass=0.95, rope=(0.002, 0.001))
+        with self.assertRaises(TypeError) if hasattr(self, "assertRaises") else np.testing.assert_raises(TypeError):
+            tracker.decide(credible_mass=0.95, rope="invalid")

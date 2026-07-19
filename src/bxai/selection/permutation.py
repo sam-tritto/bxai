@@ -73,6 +73,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         scoring: str | Callable,
         n_repeats: int = 30,
         credible_mass: float = 0.95,
+        rope: float | tuple[float, float] | None = None,
         prior_mu: float = 0.0,
         prior_nu: float = 1e-4,
         prior_alpha: float = 1e-4,
@@ -107,6 +108,14 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         credible_mass : float, default 0.95
             Posterior credible mass for the HDI used in
             :meth:`~bxai._engines.normal_ig.NormalIGTracker.decide`.
+        rope : float or tuple of (float, float) or None, default None
+            Region of Practical Equivalence.
+            - If float, the ROPE is [-rope, rope].
+            - If tuple, the ROPE is [rope[0], rope[1]].
+            - Confirmed: the entire interval is above the upper ROPE boundary.
+            - Rejected: the entire interval is contained inside the ROPE, OR the entire
+              interval is completely below the lower ROPE boundary.
+            - Tentative: the interval overlaps any boundary of the ROPE.
         prior_mu : float, default 0.0
             NIG prior mean for the importance of each feature.
         prior_nu : float, default 1e-4
@@ -123,6 +132,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         self.scoring = scoring
         self.n_repeats = n_repeats
         self.credible_mass = credible_mass
+        self.rope = rope
         self.prior_mu = prior_mu
         self.prior_nu = prior_nu
         self.prior_alpha = prior_alpha
@@ -157,6 +167,21 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
             raise ValueError(
                 f"prior_nu must be > 0 for a valid NIG prior; got {self.prior_nu!r}"
             )
+        if self.rope is not None:
+            if isinstance(self.rope, (int, float)):
+                if self.rope < 0:
+                    raise ValueError(f"rope must be non-negative; got {self.rope!r}")
+            else:
+                try:
+                    rope_lower, rope_upper = map(float, self.rope)
+                except (ValueError, TypeError):
+                    raise TypeError(
+                        f"rope must be a float, a tuple of (lower, upper), or None; got {type(self.rope).__name__}"
+                    )
+                if rope_lower > rope_upper:
+                    raise ValueError(
+                        f"rope lower bound must be <= upper bound; got ({rope_lower}, {rope_upper})"
+                    )
 
     def fit(self, X: Any, y: Any) -> "BayesianPermutation":
         """Compute the Bayesian Permutation Importance of features in X.
@@ -268,6 +293,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         self.status_ = self.tracker_.decide(
             credible_mass=self.credible_mass,
             threshold=0.0,
+            rope=self.rope,
         )
 
         # Compile results
@@ -400,6 +426,21 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
             0.0, color="dimgray", linestyle="--", alpha=0.7, label="No Impact (0.0)"
         )
 
+        if self.rope is not None:
+            if isinstance(self.rope, (int, float)):
+                rope_lower = -float(self.rope)
+                rope_upper = float(self.rope)
+            else:
+                rope_lower, rope_upper = map(float, self.rope)
+            ax.axvspan(
+                rope_lower,
+                rope_upper,
+                color="lightgray",
+                alpha=0.15,
+                label=f"ROPE [{rope_lower:.4f}, {rope_upper:.4f}]",
+                zorder=0,
+            )
+
         for idx, row in enumerate(df.itertuples()):
             color = colors.get(row.status, "#999999")
             mean_val = row.mean
@@ -453,6 +494,14 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
                 label="No Impact (0.0)",
             ),
         ]
+        if self.rope is not None:
+            legend_elements.append(
+                Patch(
+                    facecolor="lightgray",
+                    alpha=0.3,
+                    label=f"ROPE [{rope_lower:.4f}, {rope_upper:.4f}]",
+                )
+            )
         ax.legend(handles=legend_elements, loc="best")
 
         plt.tight_layout()

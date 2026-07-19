@@ -588,6 +588,36 @@ class TestBayesianPermutation:
             f"got {mean_informative:.4f}"
         )
 
+    def test_bayesian_permutation_rope_validation(self, small_Xy, small_rf):
+        """Test rope validation on BayesianPermutation."""
+        bp1 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=0.001)
+        bp1._validate_hyperparams()
+
+        bp2 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(-0.001, 0.001))
+        bp2._validate_hyperparams()
+
+        bp3 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=-0.001)
+        with pytest.raises(ValueError, match="rope must be non-negative"):
+            bp3._validate_hyperparams()
+
+        bp4 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(0.001, -0.001))
+        with pytest.raises(ValueError, match="rope lower bound must be <= upper bound"):
+            bp4._validate_hyperparams()
+
+        bp5 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(0.001, 0.002, 0.003))
+        with pytest.raises(TypeError):
+            bp5._validate_hyperparams()
+
+    def test_bayesian_permutation_rope_fit(self, small_Xy, small_rf):
+        """Test that rope parameter changes features classification as expected."""
+        X, y = small_Xy
+        bp_large = BayesianPermutation(model=small_rf, scoring="accuracy", rope=10.0, n_repeats=5, random_state=42)
+        bp_large.fit(X, y)
+
+        # All features must be rejected due to huge ROPE
+        assert len(bp_large.confirmed_) == 0
+        assert len(bp_large.rejected_) == X.shape[1]
+
 
 def test_pipeline_integration(small_Xy, small_rf):
     from sklearn.pipeline import Pipeline

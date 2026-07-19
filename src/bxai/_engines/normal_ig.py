@@ -130,17 +130,30 @@ class NormalIGTracker:
         lower, upper = stats.t.interval(credible_mass, df=df, loc=loc, scale=scale)
         return lower, upper
 
-    def decide(self, credible_mass: float = 0.95, threshold: float = 0.0) -> np.ndarray:
-        """Decide the status of each feature based on whether the HDI bounds zero.
+    def decide(
+        self,
+        credible_mass: float = 0.95,
+        threshold: float = 0.0,
+        rope: float | tuple[float, float] | None = None,
+    ) -> np.ndarray:
+        """Decide the status of each feature based on whether the HDI bounds zero or a ROPE.
 
         Parameters
         ----------
         credible_mass : float, default=0.95
             The credible mass (1 - alpha) of the interval.  Must be in (0, 1).
         threshold : float, default=0.0
-            The reference value (typically 0.0). If the interval is completely above
-            the threshold, the feature is CONFIRMED. If the interval is completely
-            below the threshold, the feature is REJECTED. Otherwise, TENTATIVE.
+            The reference value (typically 0.0). Used if rope is None. If the interval is
+            completely above the threshold, the feature is CONFIRMED. If the interval is
+            completely below the threshold, the feature is REJECTED. Otherwise, TENTATIVE.
+        rope : float or tuple of (float, float), optional
+            Region of Practical Equivalence.
+            - If float, the ROPE is [-rope, rope].
+            - If tuple, the ROPE is [rope[0], rope[1]].
+            - Confirmed: the entire interval is above the upper ROPE boundary.
+            - Rejected: the entire interval is contained inside the ROPE, OR the entire
+              interval is completely below the lower ROPE boundary.
+            - Tentative: the interval overlaps any boundary of the ROPE.
 
         Returns
         ----------
@@ -148,12 +161,37 @@ class NormalIGTracker:
         """
         if not (0.0 < credible_mass < 1.0):
             raise ValueError(f"credible_mass must be in (0, 1); got {credible_mass!r}")
+
+        # Resolve ROPE boundaries
+        if rope is None:
+            rope_lower = threshold
+            rope_upper = threshold
+        elif isinstance(rope, (int, float)):
+            if rope < 0:
+                raise ValueError(f"rope must be non-negative; got {rope!r}")
+            rope_lower = -float(rope)
+            rope_upper = float(rope)
+        else:
+            try:
+                rope_lower, rope_upper = map(float, rope)
+            except (ValueError, TypeError):
+                raise TypeError(
+                    f"rope must be a float, a tuple of (lower, upper), or None; got {type(rope).__name__}"
+                )
+            if rope_lower > rope_upper:
+                raise ValueError(
+                    f"rope lower bound must be <= upper bound; got ({rope_lower}, {rope_upper})"
+                )
+
         lower, upper = self.credible_interval(credible_mass)
         status = np.full(self.n_features, FeatureStatus.TENTATIVE, dtype=object)
 
-        # If the lower bound is above threshold, it's confirmed
-        status[lower > threshold] = FeatureStatus.CONFIRMED
-        # If the upper bound is below threshold, it's rejected
-        status[upper < threshold] = FeatureStatus.REJECTED
+        # If the lower bound is above upper ROPE boundary, it's confirmed
+        status[lower > rope_upper] = FeatureStatus.CONFIRMED
+
+        # If the entire CI is inside the ROPE or entirely below the ROPE, it's rejected
+        is_inside_rope = (lower >= rope_lower) & (upper <= rope_upper)
+        is_below_rope = upper < rope_lower
+        status[is_inside_rope | is_below_rope] = FeatureStatus.REJECTED
 
         return status

@@ -127,7 +127,9 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
             )
         if self.cores is not None:
             if not isinstance(self.cores, int) or self.cores <= 0:
-                raise ValueError(f"cores must be a positive integer or None; got {self.cores!r}")
+                raise ValueError(
+                    f"cores must be a positive integer or None; got {self.cores!r}"
+                )
 
     def _resolve_pip_method(self) -> str:
         """Return the effective PIP method given ``prior`` and ``pip_method``."""
@@ -360,9 +362,7 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError(
-                "matplotlib is required to plot. Install it with pip."
-            )
+            raise ImportError("matplotlib is required to plot. Install it with pip.")
 
         check_is_fitted(self, "support_")
         df = self.summary()
@@ -443,4 +443,3 @@ class ShrinkagePIP(SelectorMixin, BaseEstimator):
         )
         plt.tight_layout()
         return fig
-

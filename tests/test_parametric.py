@@ -547,6 +547,7 @@ class TestShrinkagePIPIntegration:
     def test_plot_raises_if_not_fitted(self):
         """plot() must raise NotFittedError if estimator is not yet fitted."""
         from sklearn.exceptions import NotFittedError
+
         sel = ShrinkagePIP(model_type="linear", prior="horseshoe")
         with pytest.raises(NotFittedError):
             sel.plot()
@@ -564,6 +565,7 @@ class TestShrinkagePIPIntegration:
         sel.fit(self._X, self._y_linear)
         fig = sel.plot()
         import matplotlib.pyplot as plt
+
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
 
@@ -938,6 +940,7 @@ class TestBARTImportanceIntegration:
     def test_plot_raises_if_not_fitted(self):
         """plot() must raise NotFittedError if estimator is not yet fitted."""
         from sklearn.exceptions import NotFittedError
+
         bi = BARTImportance(n_trees=3)
         with pytest.raises(NotFittedError):
             bi.plot()
@@ -954,6 +957,7 @@ class TestBARTImportanceIntegration:
         bi.fit(self._X, self._y)
         fig = bi.plot()
         import matplotlib.pyplot as plt
+
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
 

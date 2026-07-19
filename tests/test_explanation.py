@@ -421,10 +421,13 @@ def test_baylime_explanation_plot_runs():
         backend="analytical",
         random_state=42,
     )
-    exp_no_prior = explainer_no_prior.explain_instance(instance, linear_predict, label=0)
+    exp_no_prior = explainer_no_prior.explain_instance(
+        instance, linear_predict, label=0
+    )
 
     fig1 = exp_no_prior.plot()
     import matplotlib.pyplot as plt
+
     assert isinstance(fig1, plt.Figure)
     plt.close(fig1)
 
@@ -437,9 +440,10 @@ def test_baylime_explanation_plot_runs():
         prior_mean=prior_mean,
         random_state=42,
     )
-    exp_with_prior = explainer_with_prior.explain_instance(instance, linear_predict, label=0)
+    exp_with_prior = explainer_with_prior.explain_instance(
+        instance, linear_predict, label=0
+    )
 
     fig2 = exp_with_prior.plot()
     assert isinstance(fig2, plt.Figure)
     plt.close(fig2)
-

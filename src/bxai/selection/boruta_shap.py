@@ -564,9 +564,7 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError(
-                "matplotlib is required to plot. Install it with pip."
-            )
+            raise ImportError("matplotlib is required to plot. Install it with pip.")
 
         check_is_fitted(self, "support_")
         df = self.summary(credible_mass)
@@ -649,7 +647,9 @@ class BayesianBorutaSHAP(SelectorMixin, BaseEstimator):
                 [0],
                 color="dimgray",
                 linestyle="--",
-                label="Random Chance (0.5)" if self.mode == "discrete" else "Zero Difference",
+                label="Random Chance (0.5)"
+                if self.mode == "discrete"
+                else "Zero Difference",
             ),
         ]
         ax.legend(handles=legend_elements, loc="best")

@@ -414,9 +414,21 @@ class TestNormalIGTracker:
         assert decisions_tuple[3] == FeatureStatus.REJECTED
 
         # Test validation of invalid ROPE boundaries
-        with self.assertRaises(ValueError) if hasattr(self, "assertRaises") else np.testing.assert_raises(ValueError):
+        with (
+            self.assertRaises(ValueError)
+            if hasattr(self, "assertRaises")
+            else np.testing.assert_raises(ValueError)
+        ):
             tracker.decide(credible_mass=0.95, rope=-0.001)
-        with self.assertRaises(ValueError) if hasattr(self, "assertRaises") else np.testing.assert_raises(ValueError):
+        with (
+            self.assertRaises(ValueError)
+            if hasattr(self, "assertRaises")
+            else np.testing.assert_raises(ValueError)
+        ):
             tracker.decide(credible_mass=0.95, rope=(0.002, 0.001))
-        with self.assertRaises(TypeError) if hasattr(self, "assertRaises") else np.testing.assert_raises(TypeError):
+        with (
+            self.assertRaises(TypeError)
+            if hasattr(self, "assertRaises")
+            else np.testing.assert_raises(TypeError)
+        ):
             tracker.decide(credible_mass=0.95, rope="invalid")

@@ -87,6 +87,7 @@ class TestBayesianBorutaSHAPDiscrete:
     def test_plot_raises_if_not_fitted(self):
         """plot() must raise NotFittedError if estimator is not yet fitted."""
         from sklearn.exceptions import NotFittedError
+
         selector = BayesianBorutaSHAP(mode="discrete")
         with pytest.raises(NotFittedError):
             selector.plot()
@@ -99,6 +100,7 @@ class TestBayesianBorutaSHAPDiscrete:
 
         fig = selector.plot()
         import matplotlib.pyplot as plt
+
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
 
@@ -262,6 +264,7 @@ class TestBayesianBorutaSHAPContinuous:
 
         fig = selector.plot()
         import matplotlib.pyplot as plt
+
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
 
@@ -437,6 +440,7 @@ class TestBayesianPermutation:
     def test_plot_raises_if_not_fitted(self, small_rf):
         """plot() must raise NotFittedError if estimator is not yet fitted."""
         from sklearn.exceptions import NotFittedError
+
         selector = BayesianPermutation(model=small_rf, scoring="accuracy")
         with pytest.raises(NotFittedError):
             selector.plot()
@@ -451,6 +455,7 @@ class TestBayesianPermutation:
 
         fig = selector.plot()
         import matplotlib.pyplot as plt
+
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
 
@@ -593,25 +598,33 @@ class TestBayesianPermutation:
         bp1 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=0.001)
         bp1._validate_hyperparams()
 
-        bp2 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(-0.001, 0.001))
+        bp2 = BayesianPermutation(
+            model=small_rf, scoring="accuracy", rope=(-0.001, 0.001)
+        )
         bp2._validate_hyperparams()
 
         bp3 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=-0.001)
         with pytest.raises(ValueError, match="rope must be non-negative"):
             bp3._validate_hyperparams()
 
-        bp4 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(0.001, -0.001))
+        bp4 = BayesianPermutation(
+            model=small_rf, scoring="accuracy", rope=(0.001, -0.001)
+        )
         with pytest.raises(ValueError, match="rope lower bound must be <= upper bound"):
             bp4._validate_hyperparams()
 
-        bp5 = BayesianPermutation(model=small_rf, scoring="accuracy", rope=(0.001, 0.002, 0.003))
+        bp5 = BayesianPermutation(
+            model=small_rf, scoring="accuracy", rope=(0.001, 0.002, 0.003)
+        )
         with pytest.raises(TypeError):
             bp5._validate_hyperparams()
 
     def test_bayesian_permutation_rope_fit(self, small_Xy, small_rf):
         """Test that rope parameter changes features classification as expected."""
         X, y = small_Xy
-        bp_large = BayesianPermutation(model=small_rf, scoring="accuracy", rope=10.0, n_repeats=5, random_state=42)
+        bp_large = BayesianPermutation(
+            model=small_rf, scoring="accuracy", rope=10.0, n_repeats=5, random_state=42
+        )
         bp_large.fit(X, y)
 
         # All features must be rejected due to huge ROPE

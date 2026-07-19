@@ -399,9 +399,7 @@ class BayesianPermutation(SelectorMixin, BaseEstimator):
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError(
-                "matplotlib is required to plot. Install it with pip."
-            )
+            raise ImportError("matplotlib is required to plot. Install it with pip.")
 
         check_is_fitted(self, "support_")
         df = self.summary(credible_mass)

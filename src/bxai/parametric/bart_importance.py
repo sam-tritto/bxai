@@ -123,7 +123,9 @@ class BARTImportance(SelectorMixin, BaseEstimator):
             )
         if self.cores is not None:
             if not isinstance(self.cores, int) or self.cores <= 0:
-                raise ValueError(f"cores must be a positive integer or None; got {self.cores!r}")
+                raise ValueError(
+                    f"cores must be a positive integer or None; got {self.cores!r}"
+                )
 
     def fit(self, X: Any, y: Any) -> "BARTImportance":
         """Fit the BART model using PyMC.
@@ -324,9 +326,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError(
-                "matplotlib is required to plot. Install it with pip."
-            )
+            raise ImportError("matplotlib is required to plot. Install it with pip.")
 
         check_is_fitted(self, "support_")
         df = self.summary()
@@ -378,8 +378,7 @@ class BARTImportance(SelectorMixin, BaseEstimator):
         ax.set_xlabel("Variable Inclusion Frequency (VIF)")
         ax.set_ylabel("Feature")
         ax.set_title(
-            f"BART Variable Inclusion Frequencies\n"
-            f"(credible_mass={self.credible_mass})"
+            f"BART Variable Inclusion Frequencies\n(credible_mass={self.credible_mass})"
         )
 
         # Build legend

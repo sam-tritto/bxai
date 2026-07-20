@@ -1,6 +1,6 @@
 from bxai._utils.types import FeatureStatus
 from bxai.explanation import BayLIME, BayLIMEExplanation
-from bxai.parametric import BARTImportance, ShrinkagePIP
+from bxai.parametric import BARTImportance, BayesianCorrelation, ShrinkagePIP
 from bxai.selection import (
     BayesianBorutaSHAP,
     BayesianPermutation,
@@ -8,7 +8,7 @@ from bxai.selection import (
     cross_val_feature_stability,
 )
 
-__version__ = "0.1.2"
+__version__ = "0.1.4"
 
 __all__ = [
     "BayesianBorutaSHAP",
@@ -19,5 +19,6 @@ __all__ = [
     "BayLIMEExplanation",
     "ShrinkagePIP",
     "BARTImportance",
+    "BayesianCorrelation",
     "FeatureStatus",
 ]

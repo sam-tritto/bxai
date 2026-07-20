@@ -180,6 +180,55 @@ print("Classification Selected features:", bart_clf.confirmed_)
   <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/bart_importance_viz.png" alt="BART Variable Inclusion Frequencies" width="600"/>
 </p>
 
+### BayesianCorrelation
+
+Calculates posterior distributions of Pearson's $r$, Spearman's $\rho$, or Kendall's $\tau$ correlation coefficients using MCMC sampling. Exposes an adaptive `plot()` method (beautifully smooth KDE density curve for bivariate single-feature inputs, and a forest-style interval line plot for multivariate inputs) color-coded by magnitude-based significance rules of thumb.
+
+#### Bivariate Correlation Example:
+
+```python
+from bxai.parametric import BayesianCorrelation
+
+# Estimate Pearson correlation between two features
+model = BayesianCorrelation(
+    method="pearson",
+    backend="quick",
+    chains=1,  # chains=1, cores=1 is recommended for macOS inside Jupyter
+    cores=1,
+    random_state=42
+)
+model.fit(X["mean radius"], X["mean perimeter"])
+
+# Get the summary DataFrame with columns: "Feature 1", "Feature 2", "Posterior Mean", "Strength"
+print(model.summary()[["Feature 1", "Feature 2", "Posterior Mean", "95% HDI Lower", "95% HDI Upper", "Strength"]])
+
+# Render a KDE density plot with mean reference line and 95% HDI bar
+model.plot()
+```
+
+#### Multivariate Correlation Example:
+
+```python
+# Estimate correlation of multiple features against a single target variable
+features = ["mean radius", "mean texture", "mean perimeter"]
+target = "mean area"
+
+model_multi = BayesianCorrelation(
+    method="pearson",
+    backend="quick",
+    chains=1,
+    cores=1,
+    random_state=42
+)
+model_multi.fit(X[features], X[target])
+
+# Get the summary DataFrame with columns: "Feature", "Target", "Posterior Mean", "Strength"
+print(model_multi.summary()[["Feature", "Target", "Posterior Mean", "Strength"]])
+
+# Render a stacked forest plot of all feature correlations on the y-axis
+model_multi.plot()
+```
+
 ## License
 
 MIT License

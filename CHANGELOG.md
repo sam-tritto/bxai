@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-07-20
+
+### Added
+- **`BayesianCorrelation` Estimator**: Implemented a new `BayesianCorrelation` parametric estimator supporting Pearson, Spearman, and Kendall correlation models:
+  - Supports standard quick (bivariate normal) and latent copula (mapping ranks to latent normal scores) backends.
+  - Automatically handles both single-feature (bivariate) and multi-feature to single target scenarios.
+  - Returns a stacked pandas DataFrame in `summary_df_` (or via `summary()`) tracking `"Posterior Mean"`, `"Posterior Mode"`, `"95% HDI Lower"`, `"95% HDI Upper"`, `"Prob of Direction"`, and a `"Strength"` category (`'Strong'`, `'Modest'`, or `'Uncertain'`).
+  - Automatically renames bivariate columns to `"Feature 1"` and `"Feature 2"`, and multi-feature columns to `"Feature"` and `"Target"`.
+  - Exposes an adaptive `plot()` method returning a beautiful KDE distribution plot with filled area for single-feature models and a forest-style interval line plot for multi-feature models, both supporting customizable colors and magnitude-based rules of thumb.
+
 ## [0.1.3] - 2026-07-19
 
 ### Added

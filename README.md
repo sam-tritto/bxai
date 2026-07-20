@@ -206,6 +206,10 @@ print(model.summary()[["Feature 1", "Feature 2", "Posterior Mean", "95% HDI Lowe
 model.plot()
 ```
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/correlation_1.png" alt="Bayesian Bivariate Correlation Distribution" width="600"/>
+</p>
+
 #### Multivariate Correlation Example:
 
 ```python
@@ -228,6 +232,10 @@ print(model_multi.summary()[["Feature", "Target", "Posterior Mean", "Strength"]]
 # Render a stacked forest plot of all feature correlations on the y-axis
 model_multi.plot()
 ```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/correlation_2.png" alt="Bayesian Multivariate Correlation Forest Plot" width="600"/>
+</p>
 
 ## License
 

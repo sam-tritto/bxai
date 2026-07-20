@@ -363,9 +363,7 @@ class BayesianCorrelation(BaseEstimator):
                 }
             )
         self.summary_df_ = pd.DataFrame(summary_rows)
-        strength_arr = np.array(
-            [row["Strength"] for row in summary_rows], dtype=object
-        )
+        strength_arr = np.array([row["Strength"] for row in summary_rows], dtype=object)
 
         # 6. Simplify attributes if n_features == 1 for backward compatibility
         if n_features == 1:

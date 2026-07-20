@@ -15,6 +15,7 @@ _mcmc = pytest.mark.mcmc
 # Unit Tests (No MCMC)
 # ===========================================================================
 
+
 class TestBayesianCorrelationValidation:
     """Unit tests for parameter and input validation in BayesianCorrelation."""
 
@@ -30,7 +31,9 @@ class TestBayesianCorrelationValidation:
 
     def test_incompatible_pearson_latent_copula_raises(self):
         model = BayesianCorrelation(method="pearson", backend="latent_copula")
-        with pytest.raises(ValueError, match="not compatible with backend='latent_copula'"):
+        with pytest.raises(
+            ValueError, match="not compatible with backend='latent_copula'"
+        ):
             model._validate_hyperparams()
 
     def test_incompatible_kendall_quick_raises(self):
@@ -52,7 +55,7 @@ class TestBayesianCorrelationValidation:
 
     def test_invalid_input_shapes_raises(self):
         model = BayesianCorrelation()
-        
+
         # X is 1D and y is None
         with pytest.raises(ValueError, match="must be a 2D array or DataFrame"):
             model.fit(np.array([1.0, 2.0, 3.0]))
@@ -62,7 +65,10 @@ class TestBayesianCorrelationValidation:
             model.fit(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
 
         # X and y have inconsistent length
-        with pytest.raises(ValueError, match="Found input variables with inconsistent numbers of samples"):
+        with pytest.raises(
+            ValueError,
+            match="Found input variables with inconsistent numbers of samples",
+        ):
             model.fit(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0]))
 
         # Too few samples
@@ -88,6 +94,7 @@ class TestBayesianCorrelationValidation:
 # ===========================================================================
 # Integration Tests (MCMC)
 # ===========================================================================
+
 
 @_slow
 @_mcmc
@@ -116,7 +123,7 @@ class TestBayesianCorrelationIntegration:
             random_state=42,
         )
         model.fit(self.data)
-        
+
         assert hasattr(model, "correlation_samples_")
         assert model.correlation_samples_.shape == (50,)
         assert model.mean_ > 0.5
@@ -201,6 +208,7 @@ class TestBayesianCorrelationIntegration:
 
     def test_plot_posterior_and_forest_plot(self):
         import matplotlib.pyplot as plt
+
         model = BayesianCorrelation(
             method="pearson",
             backend="quick",
@@ -210,26 +218,33 @@ class TestBayesianCorrelationIntegration:
             random_state=42,
         )
         model.fit(self.data)
-        
+
         # Test plot_posterior
         ax = model.plot_posterior()
         assert ax is not None
-        
+
         # Test summary
         s_df = model.summary()
         assert isinstance(s_df, pd.DataFrame)
         assert list(s_df.columns) == [
-            "Feature 1", "Feature 2", "Posterior Mean", "Posterior Mode", "95% HDI Lower", "95% HDI Upper", "Prob of Direction", "Strength"
+            "Feature 1",
+            "Feature 2",
+            "Posterior Mean",
+            "Posterior Mode",
+            "95% HDI Lower",
+            "95% HDI Upper",
+            "Prob of Direction",
+            "Strength",
         ]
-        
+
         # Test plot (forest plot)
         fig = model.plot()
         assert fig is not None
-        
+
         # Test plot with custom color
         fig_color = model.plot(color="orange")
         assert fig_color is not None
-        
+
         plt.close("all")
 
     def test_multifeature_correlation(self):
@@ -239,10 +254,10 @@ class TestBayesianCorrelationIntegration:
         f0 = 0.8 * t + np.random.normal(0, 0.5, 40)
         f1 = -0.7 * t + np.random.normal(0, 0.5, 40)
         f2 = np.random.normal(0, 1, 40)
-        
+
         X_df = pd.DataFrame({"feat_0": f0, "feat_1": f1, "feat_2": f2})
         y_ser = pd.Series(t, name="target_var")
-        
+
         model = BayesianCorrelation(
             method="pearson",
             backend="quick",
@@ -252,7 +267,7 @@ class TestBayesianCorrelationIntegration:
             random_state=42,
         )
         model.fit(X_df, y_ser)
-        
+
         # Verify shape of attributes
         assert isinstance(model.correlation_samples_, np.ndarray)
         assert model.correlation_samples_.shape == (30, 3)
@@ -266,18 +281,30 @@ class TestBayesianCorrelationIntegration:
         assert len(model.hdi_upper_) == 3
         assert isinstance(model.probability_of_direction_, np.ndarray)
         assert len(model.probability_of_direction_) == 3
-        
+
         # Verify signs/directions of correlations
         assert model.mean_[0] > 0.4
         assert model.mean_[1] < -0.4
         assert abs(model.mean_[2]) < 0.3
-        
+
         # Verify summary_df_ structure
         assert isinstance(model.summary_df_, pd.DataFrame)
         assert list(model.summary_df_.columns) == [
-            "Feature", "Target", "Posterior Mean", "Posterior Mode", "95% HDI Lower", "95% HDI Upper", "Prob of Direction", "Strength"
+            "Feature",
+            "Target",
+            "Posterior Mean",
+            "Posterior Mode",
+            "95% HDI Lower",
+            "95% HDI Upper",
+            "Prob of Direction",
+            "Strength",
         ]
         assert list(model.summary_df_["Feature"]) == ["feat_0", "feat_1", "feat_2"]
-        assert list(model.summary_df_["Target"]) == ["target_var", "target_var", "target_var"]
-        assert set(model.summary_df_["Strength"]).issubset({"Strong", "Modest", "Uncertain"})
-
+        assert list(model.summary_df_["Target"]) == [
+            "target_var",
+            "target_var",
+            "target_var",
+        ]
+        assert set(model.summary_df_["Strength"]).issubset(
+            {"Strong", "Modest", "Uncertain"}
+        )

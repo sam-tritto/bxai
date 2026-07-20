@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 import pandas as pd
-from scipy.stats import rankdata, gaussian_kde
 from scipy.special import ndtri
+from scipy.stats import gaussian_kde, rankdata
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 
 from bxai._utils.hdi import compute_hdi
-from bxai._utils.validation import check_consistent_length
 
 
 class BayesianCorrelation(BaseEstimator):
@@ -220,17 +220,22 @@ class BayesianCorrelation(BaseEstimator):
                     rho_latent = pm.Uniform(f"rho_latent_{j}", lower=-1.0, upper=1.0)
 
                     # Bivariate Normal covariance matrix with var=1.0
-                    cov = pt.stack([
-                        pt.stack([1.0, rho_latent]),
-                        pt.stack([rho_latent, 1.0])
-                    ])
+                    cov = pt.stack(
+                        [pt.stack([1.0, rho_latent]), pt.stack([rho_latent, 1.0])]
+                    )
 
                     # Likelihood
-                    pm.MvNormal(f"observed_{j}", mu=pt.zeros(2), cov=cov, observed=z_data)
+                    pm.MvNormal(
+                        f"observed_{j}", mu=pt.zeros(2), cov=cov, observed=z_data
+                    )
 
                     # Track deterministic mappings
-                    pm.Deterministic(f"kendall_tau_{j}", (2.0 / np.pi) * pt.arcsin(rho_latent))
-                    pm.Deterministic(f"spearman_rho_{j}", (6.0 / np.pi) * pt.arcsin(rho_latent / 2.0))
+                    pm.Deterministic(
+                        f"kendall_tau_{j}", (2.0 / np.pi) * pt.arcsin(rho_latent)
+                    )
+                    pm.Deterministic(
+                        f"spearman_rho_{j}", (6.0 / np.pi) * pt.arcsin(rho_latent / 2.0)
+                    )
 
                 elif self.method == "spearman":  # and backend == 'quick'
                     # Convert data to ranks
@@ -240,12 +245,20 @@ class BayesianCorrelation(BaseEstimator):
 
                     mu = pm.Normal(f"mu_{j}", mu=n_obs / 2.0, sigma=10.0, shape=2)
                     sigma = pm.HalfNormal(f"sigma_{j}", sigma=10.0, shape=2)
-                    rho_spearman = pm.Uniform(f"rho_spearman_{j}", lower=-1.0, upper=1.0)
+                    rho_spearman = pm.Uniform(
+                        f"rho_spearman_{j}", lower=-1.0, upper=1.0
+                    )
 
-                    cov = pt.stack([
-                        pt.stack([sigma[0]**2, rho_spearman * sigma[0] * sigma[1]]),
-                        pt.stack([rho_spearman * sigma[0] * sigma[1], sigma[1]**2])
-                    ])
+                    cov = pt.stack(
+                        [
+                            pt.stack(
+                                [sigma[0] ** 2, rho_spearman * sigma[0] * sigma[1]]
+                            ),
+                            pt.stack(
+                                [rho_spearman * sigma[0] * sigma[1], sigma[1] ** 2]
+                            ),
+                        ]
+                    )
 
                     pm.MvNormal(f"observed_{j}", mu=mu, cov=cov, observed=ranks_data)
 
@@ -256,10 +269,12 @@ class BayesianCorrelation(BaseEstimator):
                     sigma = pm.HalfNormal(f"sigma_{j}", sigma=5.0, shape=2)
                     rho = pm.Uniform(f"rho_{j}", lower=-1.0, upper=1.0)
 
-                    cov = pt.stack([
-                        pt.stack([sigma[0]**2, rho * sigma[0] * sigma[1]]),
-                        pt.stack([rho * sigma[0] * sigma[1], sigma[1]**2])
-                    ])
+                    cov = pt.stack(
+                        [
+                            pt.stack([sigma[0] ** 2, rho * sigma[0] * sigma[1]]),
+                            pt.stack([rho * sigma[0] * sigma[1], sigma[1] ** 2]),
+                        ]
+                    )
 
                     pm.MvNormal(f"observed_{j}", mu=mu, cov=cov, observed=pair_data)
 
@@ -279,7 +294,11 @@ class BayesianCorrelation(BaseEstimator):
         all_samples = []
         for j in range(n_features):
             if self.backend == "latent_copula":
-                var_name = f"spearman_rho_{j}" if self.method == "spearman" else f"kendall_tau_{j}"
+                var_name = (
+                    f"spearman_rho_{j}"
+                    if self.method == "spearman"
+                    else f"kendall_tau_{j}"
+                )
             elif self.method == "spearman":
                 var_name = f"rho_spearman_{j}"
             else:
@@ -306,7 +325,9 @@ class BayesianCorrelation(BaseEstimator):
         self.mode_ = np.array(modes)
 
         # HDI computation
-        self.hdi_lower_, self.hdi_upper_ = compute_hdi(self.correlation_samples_, self.credible_mass)
+        self.hdi_lower_, self.hdi_upper_ = compute_hdi(
+            self.correlation_samples_, self.credible_mass
+        )
         self.hdi_ = (self.hdi_lower_, self.hdi_upper_)
 
         # Probability of Direction
@@ -329,18 +350,22 @@ class BayesianCorrelation(BaseEstimator):
             else:
                 strength = "Modest"
 
-            summary_rows.append({
-                "Feature": self.feature_names_[j],
-                "Target": self.target_name_,
-                "Posterior Mean": mean_val,
-                "Posterior Mode": float(self.mode_[j]),
-                "95% HDI Lower": hdi_l,
-                "95% HDI Upper": hdi_u,
-                "Prob of Direction": float(self.probability_of_direction_[j]),
-                "Strength": strength
-            })
+            summary_rows.append(
+                {
+                    "Feature": self.feature_names_[j],
+                    "Target": self.target_name_,
+                    "Posterior Mean": mean_val,
+                    "Posterior Mode": float(self.mode_[j]),
+                    "95% HDI Lower": hdi_l,
+                    "95% HDI Upper": hdi_u,
+                    "Prob of Direction": float(self.probability_of_direction_[j]),
+                    "Strength": strength,
+                }
+            )
         self.summary_df_ = pd.DataFrame(summary_rows)
-        self.strength_ = np.array([row["Strength"] for row in summary_rows], dtype=object)
+        self.strength_ = np.array(
+            [row["Strength"] for row in summary_rows], dtype=object
+        )
 
         # 6. Simplify attributes if n_features == 1 for backward compatibility
         if n_features == 1:
@@ -353,10 +378,9 @@ class BayesianCorrelation(BaseEstimator):
             self.correlation_samples_ = self.correlation_samples_.ravel()
             self.variable_names_ = [self.feature_names_[0], self.target_name_]
             self.strength_ = str(self.strength_[0])
-            self.summary_df_ = self.summary_df_.rename(columns={
-                "Feature": "Feature 1",
-                "Target": "Feature 2"
-            })
+            self.summary_df_ = self.summary_df_.rename(
+                columns={"Feature": "Feature 1", "Target": "Feature 2"}
+            )
         else:
             self.variable_names_ = self.feature_names_ + [self.target_name_]
 
@@ -384,13 +408,21 @@ class BayesianCorrelation(BaseEstimator):
                 "arviz is required to use plot_posterior. Please install it."
             )
 
-        n_features = 1 if self.correlation_samples_.ndim == 1 else self.correlation_samples_.shape[1]
+        n_features = (
+            1
+            if self.correlation_samples_.ndim == 1
+            else self.correlation_samples_.shape[1]
+        )
 
         # Resolve the var_names of interest in the trace
         var_names = []
         for j in range(n_features):
             if self.backend == "latent_copula":
-                var_name = f"spearman_rho_{j}" if self.method == "spearman" else f"kendall_tau_{j}"
+                var_name = (
+                    f"spearman_rho_{j}"
+                    if self.method == "spearman"
+                    else f"kendall_tau_{j}"
+                )
             elif self.method == "spearman":
                 var_name = f"rho_spearman_{j}"
             else:
@@ -437,7 +469,11 @@ class BayesianCorrelation(BaseEstimator):
         except ImportError:
             raise ImportError("matplotlib is required to plot. Install it with pip.")
 
-        n_features = 1 if self.correlation_samples_.ndim == 1 else self.correlation_samples_.shape[1]
+        n_features = (
+            1
+            if self.correlation_samples_.ndim == 1
+            else self.correlation_samples_.shape[1]
+        )
 
         if n_features == 1:
             # Bivariate single-feature density/dist plot
@@ -454,7 +490,9 @@ class BayesianCorrelation(BaseEstimator):
                 elif abs(mean_val) > 0.6:
                     plot_color = "#82B94C"  # green if magnitude > 0.6
                 else:
-                    plot_color = "#D4AC0D"  # yellow if magnitude > 0 and doesn't cross 0
+                    plot_color = (
+                        "#D4AC0D"  # yellow if magnitude > 0 and doesn't cross 0
+                    )
 
             fig, ax = plt.subplots(figsize=(7.5, 4.5))
 
@@ -468,29 +506,50 @@ class BayesianCorrelation(BaseEstimator):
             kde_vals = kde.evaluate(x_grid)
 
             # Plot filled area and boundary line
-            ax.fill_between(x_grid, kde_vals, color=plot_color, alpha=0.25, label="Posterior Density")
+            ax.fill_between(
+                x_grid,
+                kde_vals,
+                color=plot_color,
+                alpha=0.25,
+                label="Posterior Density",
+            )
             ax.plot(x_grid, kde_vals, color=plot_color, linewidth=2.5)
 
             # Draw vertical line for mean
-            ax.axvline(mean_val, color="#2C3E50", linestyle="--", linewidth=1.5, label=f"Mean: {mean_val:.3f}")
+            ax.axvline(
+                mean_val,
+                color="#2C3E50",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"Mean: {mean_val:.3f}",
+            )
 
             # Draw horizontal bar for 95% HDI
             y_max = ax.get_ylim()[1]
             hdi_y = y_max * 0.05
-            ax.hlines(hdi_y, hdi_l, hdi_u, color="#34495E", linewidth=4, label=f"95% HDI: [{hdi_l:.3f}, {hdi_u:.3f}]")
+            ax.hlines(
+                hdi_y,
+                hdi_l,
+                hdi_u,
+                color="#34495E",
+                linewidth=4,
+                label=f"95% HDI: [{hdi_l:.3f}, {hdi_u:.3f}]",
+            )
             ax.plot([hdi_l, hdi_u], [hdi_y, hdi_y], "o", color="#2C3E50", markersize=8)
 
             ax.set_title(
                 f"Posterior Correlation: {self.feature_names_[0]} vs {self.target_name_}",
                 fontsize=12,
                 fontweight="bold",
-                pad=12
+                pad=12,
             )
             ax.set_xlabel("Correlation Parameter value (ρ)", fontsize=10)
             ax.set_ylabel("Density", fontsize=10)
             ax.set_xlim(xmin, xmax)
             ax.grid(True, linestyle=":", alpha=0.5)
-            ax.legend(loc="upper left", frameon=True, facecolor="white", edgecolor="none")
+            ax.legend(
+                loc="upper left", frameon=True, facecolor="white", edgecolor="none"
+            )
             plt.tight_layout()
             return fig
 
@@ -515,9 +574,13 @@ class BayesianCorrelation(BaseEstimator):
                     elif abs(mean_val) > 0.6:
                         line_color = "#82B94C"  # green if magnitude > 0.6
                     else:
-                        line_color = "#D4AC0D"  # yellow if magnitude > 0 and doesn't cross 0
+                        line_color = (
+                            "#D4AC0D"  # yellow if magnitude > 0 and doesn't cross 0
+                        )
 
-                ax.hlines(y=idx, xmin=hdi_l, xmax=hdi_u, colors=line_color, linewidth=2.0)
+                ax.hlines(
+                    y=idx, xmin=hdi_l, xmax=hdi_u, colors=line_color, linewidth=2.0
+                )
                 ax.plot(mean_val, idx, "o", color=line_color, markersize=6)
 
             ax.set_yticks(range(len(df)))

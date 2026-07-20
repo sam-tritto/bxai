@@ -201,7 +201,7 @@ class BayesianCorrelation(BaseEstimator):
             )
 
         # 2. Build the PyMC model
-        with pm.Model():  # type: ignore
+        with pm.Model():
             for j in range(n_features):
                 if self.backend == "latent_copula":
                     # Convert data to normal scores
@@ -214,9 +214,10 @@ class BayesianCorrelation(BaseEstimator):
                     # Transform to standard normal scores
                     z_x = ndtri(u_x)
                     z_y = ndtri(u_y)
+
                     z_data = np.column_stack([z_x, z_y])
 
-                    # Prior for latent correlation
+                    # Uniform prior on latent correlation
                     rho_latent = pm.Uniform(f"rho_latent_{j}", lower=-1.0, upper=1.0)
 
                     # Bivariate Normal covariance matrix with var=1.0
@@ -262,7 +263,7 @@ class BayesianCorrelation(BaseEstimator):
 
                     pm.MvNormal(f"observed_{j}", mu=mu, cov=cov, observed=ranks_data)
 
-                else:  # pearson and backend == 'quick'
+                else:  # self.method == 'pearson' and backend == 'quick'
                     pair_data = np.column_stack([feature_cols[j], y_arr])
 
                     mu = pm.Normal(f"mu_{j}", mu=0.0, sigma=10.0, shape=2)
@@ -278,15 +279,15 @@ class BayesianCorrelation(BaseEstimator):
 
                     pm.MvNormal(f"observed_{j}", mu=mu, cov=cov, observed=pair_data)
 
-            # Sample posterior
+            # Sampling step
             self.trace_ = pm.sample(
                 draws=self.n_samples,
                 tune=self.tune,
                 chains=self.chains,
                 cores=self.cores,
                 random_seed=self.random_state,
-                progressbar=self.progressbar,
-                return_inferencedata=True,
+                compute_convergence_checks=False,
+                progressbar=False,
             )
 
         # 3. Extract correct target samples for all features
@@ -310,7 +311,7 @@ class BayesianCorrelation(BaseEstimator):
         self.correlation_samples_ = np.column_stack(all_samples)
 
         # 4. Compute metrics
-        self.mean_ = np.mean(self.correlation_samples_, axis=0)
+        mean_arr = np.mean(self.correlation_samples_, axis=0)
 
         # Estimate the mode using gaussian KDE for each feature
         modes = []
@@ -322,25 +323,24 @@ class BayesianCorrelation(BaseEstimator):
                 modes.append(float(grid[np.argmax(kde.evaluate(grid))]))
             except Exception:
                 modes.append(float(np.mean(col_samples)))
-        self.mode_ = np.array(modes)
+        mode_arr = np.array(modes)
 
         # HDI computation
-        self.hdi_lower_, self.hdi_upper_ = compute_hdi(
+        hdi_lower_arr, hdi_upper_arr = compute_hdi(
             self.correlation_samples_, self.credible_mass
         )
-        self.hdi_ = (self.hdi_lower_, self.hdi_upper_)
 
         # Probability of Direction
         prop_pos = np.mean(self.correlation_samples_ > 0.0, axis=0)
         prop_neg = np.mean(self.correlation_samples_ < 0.0, axis=0)
-        self.probability_of_direction_ = np.maximum(prop_pos, prop_neg)
+        prob_dir_arr = np.maximum(prop_pos, prop_neg)
 
         # 5. Build summary DataFrame
         summary_rows = []
         for j in range(n_features):
-            mean_val = float(self.mean_[j])
-            hdi_l = float(self.hdi_lower_[j])
-            hdi_u = float(self.hdi_upper_[j])
+            mean_val = float(mean_arr[j])
+            hdi_l = float(hdi_lower_arr[j])
+            hdi_u = float(hdi_upper_arr[j])
 
             # Determine strength category
             if hdi_l <= 0.0 <= hdi_u:
@@ -355,34 +355,41 @@ class BayesianCorrelation(BaseEstimator):
                     "Feature": self.feature_names_[j],
                     "Target": self.target_name_,
                     "Posterior Mean": mean_val,
-                    "Posterior Mode": float(self.mode_[j]),
+                    "Posterior Mode": float(mode_arr[j]),
                     "95% HDI Lower": hdi_l,
                     "95% HDI Upper": hdi_u,
-                    "Prob of Direction": float(self.probability_of_direction_[j]),
+                    "Prob of Direction": float(prob_dir_arr[j]),
                     "Strength": strength,
                 }
             )
         self.summary_df_ = pd.DataFrame(summary_rows)
-        self.strength_ = np.array(
+        strength_arr = np.array(
             [row["Strength"] for row in summary_rows], dtype=object
         )
 
         # 6. Simplify attributes if n_features == 1 for backward compatibility
         if n_features == 1:
-            self.mean_ = float(self.mean_[0])
-            self.mode_ = float(self.mode_[0])
-            self.hdi_lower_ = float(self.hdi_lower_[0])
-            self.hdi_upper_ = float(self.hdi_upper_[0])
+            self.mean_ = float(mean_arr[0])
+            self.mode_ = float(mode_arr[0])
+            self.hdi_lower_ = float(hdi_lower_arr[0])
+            self.hdi_upper_ = float(hdi_upper_arr[0])
             self.hdi_ = (self.hdi_lower_, self.hdi_upper_)
-            self.probability_of_direction_ = float(self.probability_of_direction_[0])
+            self.probability_of_direction_ = float(prob_dir_arr[0])
             self.correlation_samples_ = self.correlation_samples_.ravel()
             self.variable_names_ = [self.feature_names_[0], self.target_name_]
-            self.strength_ = str(self.strength_[0])
+            self.strength_ = str(strength_arr[0])
             self.summary_df_ = self.summary_df_.rename(
                 columns={"Feature": "Feature 1", "Target": "Feature 2"}
             )
         else:
+            self.mean_ = mean_arr
+            self.mode_ = mode_arr
+            self.hdi_lower_ = hdi_lower_arr
+            self.hdi_upper_ = hdi_upper_arr
+            self.hdi_ = (self.hdi_lower_, self.hdi_upper_)
+            self.probability_of_direction_ = prob_dir_arr
             self.variable_names_ = self.feature_names_ + [self.target_name_]
+            self.strength_ = strength_arr
 
         return self
 

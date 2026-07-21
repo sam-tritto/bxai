@@ -25,6 +25,7 @@ A Python package implementing rigorous Bayesian methods for feature selection an
 - **Parametric & Native Bayesian Importance**
   - `ShrinkagePIP`: High-dimensional GLMs with Horseshoe and Lasso regularizing priors, tracking Posterior Inclusion Probabilities (PIP). Uses the posterior shrinkage factor κ_j = 1/(1+λ_j²τ²) for the Horseshoe prior (correct for continuous shrinkage distributions) and an auto-data-scaled |β_j| threshold for the Lasso (requires `mcmc` extra).
   - `BARTImportance`: Variable inclusion frequency (VIF) tracking from native Bayesian Additive Regression Trees (requires `mcmc` extra).
+  - `BayesianCorrelation`: Computes the posterior distribution of correlation coefficients (Pearson's $r$, Spearman's $\rho$, or Kendall's $\tau$) using MCMC sampling. Exposes an adaptive plotting method (bivariate KDE density curves or stacked forest interval plots) color-coded by magnitude-based strength rules (requires `mcmc` extra).
 
 
 ## Installation

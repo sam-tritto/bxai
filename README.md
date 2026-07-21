@@ -198,11 +198,13 @@ from bxai.parametric import BayesianCorrelation
 model = BayesianCorrelation(
     method="pearson",
     backend="quick",
+    n_samples=500,
+    tune=500,
     chains=1,  # chains=1, cores=1 is recommended for macOS inside Jupyter
     cores=1,
     random_state=42
 )
-model.fit(X["mean radius"], X["mean perimeter"])
+model.fit(X["mean radius"].iloc[:100], X["mean perimeter"].iloc[:100])
 
 # Get the summary DataFrame with columns: "Feature 1", "Feature 2", "Posterior Mean", "Strength"
 print(model.summary()[["Feature 1", "Feature 2", "Posterior Mean", "95% HDI Lower", "95% HDI Upper", "Strength"]])
@@ -219,17 +221,16 @@ model.plot()
 
 ```python
 # Estimate correlation of multiple features against a single target variable
-features = ["mean radius", "mean texture", "mean perimeter"]
-target = "mean area"
-
 model_multi = BayesianCorrelation(
     method="pearson",
     backend="quick",
+    n_samples=500,
+    tune=500,
     chains=1,
     cores=1,
     random_state=42
 )
-model_multi.fit(X[features], X[target])
+model_multi.fit(X.iloc[:100], y.iloc[:100])
 
 # Get the summary DataFrame with columns: "Feature", "Target", "Posterior Mean", "Strength"
 print(model_multi.summary()[["Feature", "Target", "Posterior Mean", "Strength"]])

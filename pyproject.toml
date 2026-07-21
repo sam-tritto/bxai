@@ -60,6 +60,8 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=7.0.0",
     "pytest-xdist>=3.0.0",
+    "pytest-cov>=5.0.0",
+    "coverage[toml]>=7.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
     "ipykernel>=7.3.0",
@@ -146,4 +148,16 @@ module = [
     "pytensor.*",
 ]
 ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/bxai"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 60
 

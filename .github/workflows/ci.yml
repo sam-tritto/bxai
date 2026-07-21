@@ -38,5 +38,20 @@ jobs:
       - name: Run Mypy Type Check
         run: uv run mypy src/
 
-      - name: Run Tests (fast suite)
-        run: uv run pytest --skip-slow
+      - name: Run tests with coverage
+        run: |
+          uv run pytest tests/ \
+            --cov=src/bxai \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --skip-slow \
+            -v
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          flags: unittests
+          fail_ci_if_error: false

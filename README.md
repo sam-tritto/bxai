@@ -1,10 +1,15 @@
-# bxai
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/logo.png" alt="bxai Logo" width="400"/>
+  <img src="https://raw.githubusercontent.com/sam-tritto/bxai/main/assets/logo.png" alt="bxai Logo" width="400">
+  <br>
+  <br>
+  <a href="https://pypi.org/project/bxai/"><img src="https://img.shields.io/pypi/v/bxai.svg" alt="PyPI version"></a>
+  <a href="https://github.com/sam-tritto/bxai/actions/workflows/ci.yml"><img src="https://github.com/sam-tritto/bxai/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://codecov.io/gh/sam-tritto/bxai"><img src="https://codecov.io/gh/sam-tritto/bxai/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/uv-%23DE5FE9.svg?style=flat&logo=uv&logoColor=white" alt="uv"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-# Bayesian Feature Selection and Attribution Suite
+# bxai: Bayesian Feature Selection and Attribution Suite
 
 A Python package implementing rigorous Bayesian methods for feature selection and model explainability. Where conjugate structure permits, bxai uses closed-form analytical updates (Beta-Binomial, Normal-Inverse-Gamma) to keep iteration fast. Where the model demands full posterior inference — Horseshoe GLMs, BART, and the optional MCMC path in BayLIME; it delegates to PyMC. The result is a unified toolkit that matches computational cost to statistical necessity.
 
